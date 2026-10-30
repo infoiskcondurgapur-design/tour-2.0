@@ -1327,13 +1327,24 @@ CREATE TABLE IF NOT EXISTS public.tour_transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Grants for PostgREST & API roles
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.tour_tours TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.tour_registrations TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.tour_transactions TO anon, authenticated, service_role;
+
 ALTER TABLE public.tour_tours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_transactions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow anon on tour_tours" ON public.tour_tours FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "Allow anon on tour_registrations" ON public.tour_registrations FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "Allow anon on tour_transactions" ON public.tour_transactions FOR ALL TO anon USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow anon on tour_tours" ON public.tour_tours;
+CREATE POLICY "Allow anon on tour_tours" ON public.tour_tours FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon on tour_registrations" ON public.tour_registrations;
+CREATE POLICY "Allow anon on tour_registrations" ON public.tour_registrations FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow anon on tour_transactions" ON public.tour_transactions;
+CREATE POLICY "Allow anon on tour_transactions" ON public.tour_transactions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
 DO $$
 BEGIN
@@ -1346,7 +1357,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_transactions') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_transactions;
   END IF;
-END $$;`;
+END $$;
+
+NOTIFY pgrst, 'reload schema';`;
                       navigator.clipboard.writeText(sql);
                       setCopiedSql(true);
                       setTimeout(() => setCopiedSql(false), 3000);
