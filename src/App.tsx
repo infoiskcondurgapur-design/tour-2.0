@@ -17,7 +17,13 @@ import {
   Menu,
   UserPlus,
   Users,
-  Armchair
+  Armchair,
+  Database,
+  CheckCircle2,
+  RefreshCw,
+  ExternalLink,
+  Copy,
+  Check
 } from 'lucide-react';
 import { FinancialTransaction, TransactionType, PassengerRegistration, Tour, TourStatus, RefundStatus } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -25,6 +31,20 @@ import { RegistrationView } from './components/RegistrationView';
 import { PassengersRosterView } from './components/PassengersRosterView';
 import { ToursView } from './components/ToursView';
 import { SeatAllocationView } from './components/SeatAllocationView';
+import { 
+  supabase, 
+  isSupabaseConfigured,
+  fetchToursFromDb,
+  upsertTourInDb,
+  deleteTourFromDb,
+  fetchRegistrationsFromDb,
+  upsertRegistrationInDb,
+  deleteRegistrationFromDb,
+  fetchTransactionsFromDb,
+  upsertTransactionInDb,
+  deleteTransactionFromDb,
+  deleteTransactionsForPassengerInDb
+} from './lib/supabase';
 
 const TX_STORAGE_KEY = 'real_finance_dashboard_data_v1';
 const REG_STORAGE_KEY = 'real_finance_registrations_v1';
@@ -67,8 +87,111 @@ export function App() {
 
   const [selectedTour, setSelectedTour] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [dbStatus, setDbStatus] = useState<'connected' | 'syncing' | 'offline' | 'needs_setup'>('syncing');
+  const [showDbModal, setShowDbModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
 
-  // Sync state to localStorage
+  // Cloud Database (Supabase) Sync & Realtime Listener
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncCloudData() {
+      if (!supabase || !isSupabaseConfigured) {
+        if (isMounted) setDbStatus('offline');
+        return;
+      }
+
+      try {
+        if (isMounted) setDbStatus('syncing');
+        const [remoteTours, remoteRegs, remoteTxs] = await Promise.all([
+          fetchToursFromDb(),
+          fetchRegistrationsFromDb(),
+          fetchTransactionsFromDb(),
+        ]);
+
+        if (!isMounted) return;
+
+        // If all 3 returned null, tables do not exist yet on Supabase
+        if (remoteTours === null && remoteRegs === null && remoteTxs === null) {
+          setDbStatus('needs_setup');
+          return;
+        }
+
+        // 1. Sync Tours
+        if (remoteTours !== null) {
+          if (remoteTours.length > 0) {
+            setTours(remoteTours);
+          } else if (tours.length > 0) {
+            // Push existing local tours to cloud
+            for (const t of tours) {
+              await upsertTourInDb(t);
+            }
+          }
+        }
+
+        // 2. Sync Registrations
+        if (remoteRegs !== null) {
+          if (remoteRegs.length > 0) {
+            setRegistrations(remoteRegs);
+          } else if (registrations.length > 0) {
+            // Push existing local registrations to cloud
+            for (const r of registrations) {
+              await upsertRegistrationInDb(r);
+            }
+          }
+        }
+
+        // 3. Sync Transactions
+        if (remoteTxs !== null) {
+          if (remoteTxs.length > 0) {
+            setTransactions(remoteTxs);
+          } else if (transactions.length > 0) {
+            // Push existing local transactions to cloud
+            for (const tx of transactions) {
+              await upsertTransactionInDb(tx);
+            }
+          }
+        }
+
+        setDbStatus('connected');
+      } catch (e) {
+        console.warn('Initial cloud sync exception:', e);
+        if (isMounted) setDbStatus('offline');
+      }
+    }
+
+    syncCloudData();
+
+    // Subscribe to realtime changes so all devices stay in sync
+    if (supabase) {
+      const channel = supabase
+        .channel('realtime_tour_channel')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tour_tours' }, async () => {
+          const fresh = await fetchToursFromDb();
+          if (fresh && isMounted) setTours(fresh);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tour_registrations' }, async () => {
+          const fresh = await fetchRegistrationsFromDb();
+          if (fresh && isMounted) setRegistrations(fresh);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tour_transactions' }, async () => {
+          const fresh = await fetchTransactionsFromDb();
+          if (fresh && isMounted) setTransactions(fresh);
+        })
+        .subscribe();
+
+      return () => {
+        isMounted = false;
+        supabase?.removeChannel(channel);
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Sync state to localStorage as instant offline cache
   useEffect(() => {
     try {
       localStorage.setItem(TOURS_STORAGE_KEY, JSON.stringify(tours));
@@ -179,6 +302,7 @@ export function App() {
     };
 
     setTransactions(prev => [newTx, ...prev]);
+    upsertTransactionInDb(newTx);
     setIsModalOpen(false);
     setFormData({
       type: 'earning',
@@ -195,6 +319,7 @@ export function App() {
   // Handle New Registration: automatically updates Total Earning and Due!
   const handleAddRegistration = (reg: PassengerRegistration) => {
     setRegistrations(prev => [reg, ...prev]);
+    upsertRegistrationInDb(reg);
 
     const newTxs: FinancialTransaction[] = [];
 
@@ -234,20 +359,30 @@ export function App() {
 
     if (newTxs.length > 0) {
       setTransactions(prev => [...newTxs, ...prev]);
+      newTxs.forEach(tx => upsertTransactionInDb(tx));
     }
   };
 
   // Tour management handlers
   const handleAddTour = (tour: Tour) => {
     setTours(prev => [tour, ...prev]);
+    upsertTourInDb(tour);
   };
 
   const handleDeleteTour = (id: string) => {
     setTours(prev => prev.filter(t => t.id !== id));
+    deleteTourFromDb(id);
   };
 
   const handleUpdateTourStatus = (id: string, status: TourStatus) => {
-    setTours(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    setTours(prev => prev.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, status };
+        upsertTourInDb(updated);
+        return updated;
+      }
+      return t;
+    }));
   };
 
   // Handle Processing Refund for a registered passenger
@@ -286,21 +421,21 @@ export function App() {
     }
 
     // Update passenger registration record
+    const updatedTarget: PassengerRegistration = {
+      ...target,
+      refundAmount: newTotalRefund,
+      refundStatus: newRefundStatus,
+      refundReason: refundReason.trim(),
+      refundDate: new Date().toISOString().split('T')[0],
+      refundMethod,
+      dueAmount: newDue,
+      status: newStatus,
+    };
+
     setRegistrations(prev =>
-      prev.map(r => {
-        if (r.id !== regId) return r;
-        return {
-          ...r,
-          refundAmount: newTotalRefund,
-          refundStatus: newRefundStatus,
-          refundReason: refundReason.trim(),
-          refundDate: new Date().toISOString().split('T')[0],
-          refundMethod,
-          dueAmount: newDue,
-          status: newStatus,
-        };
-      })
+      prev.map(r => (r.id === regId ? updatedTarget : r))
     );
+    upsertRegistrationInDb(updatedTarget);
 
     // Automatically create financial transaction of type 'refund' to update dashboard!
     const refundTx: FinancialTransaction = {
@@ -318,6 +453,7 @@ export function App() {
     };
 
     setTransactions(prev => [refundTx, ...prev]);
+    upsertTransactionInDb(refundTx);
   };
 
   // Delete registration and clean up associated records
@@ -326,6 +462,8 @@ export function App() {
     if (!target) return;
 
     setRegistrations(prev => prev.filter(r => r.id !== id));
+    deleteRegistrationFromDb(id);
+    deleteTransactionsForPassengerInDb(target.tourName, target.fullName);
 
     // Reconcile transactions: remove dues and advances tied to this deleted registration
     setTransactions(prev =>
@@ -341,6 +479,7 @@ export function App() {
     setRegistrations(prev =>
       prev.map(r => (r.id === updatedReg.id ? updatedReg : r))
     );
+    upsertRegistrationInDb(updatedReg);
   };
 
   // Seat Allocation Handlers
@@ -352,11 +491,13 @@ export function App() {
     setRegistrations(prev =>
       prev.map(r => {
         if (r.id !== passengerId) return r;
-        return {
+        const updated = {
           ...r,
           seatNumber,
           vehicleName: seatNumber ? vehicleName : undefined,
         };
+        upsertRegistrationInDb(updated);
+        return updated;
       })
     );
   };
@@ -371,11 +512,13 @@ export function App() {
       prev.map(r => {
         const u = updateMap.get(r.id);
         if (!u) return r;
-        return {
+        const updated = {
           ...r,
           seatNumber: u.seatNumber,
           vehicleName: u.vehicleName,
         };
+        upsertRegistrationInDb(updated);
+        return updated;
       })
     );
   };
@@ -384,11 +527,13 @@ export function App() {
     setRegistrations(prev =>
       prev.map(r => {
         if (r.tourName !== tourName) return r;
-        return {
+        const updated = {
           ...r,
           seatNumber: undefined,
           vehicleName: undefined,
         };
+        upsertRegistrationInDb(updated);
+        return updated;
       })
     );
   };
@@ -400,6 +545,7 @@ export function App() {
   // Delete single transaction
   const handleDeleteTx = (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
+    deleteTransactionFromDb(id);
   };
 
   // Clear all data
@@ -500,6 +646,41 @@ export function App() {
             </div>
 
             <div className="flex items-center gap-2.5">
+              {/* Database Status Indicator */}
+              <button
+                onClick={() => setShowDbModal(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                  dbStatus === 'connected'
+                    ? 'bg-emerald-950/70 border-emerald-600/70 text-emerald-300 hover:bg-emerald-900/60 shadow-xs shadow-emerald-500/20'
+                    : dbStatus === 'syncing'
+                    ? 'bg-sky-950/70 border-sky-600/70 text-sky-300 animate-pulse'
+                    : dbStatus === 'needs_setup'
+                    ? 'bg-amber-950/80 border-amber-500/80 text-amber-300 hover:bg-amber-900/80 shadow-xs shadow-amber-500/20 animate-pulse'
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                }`}
+                title="Cloud Database (Supabase) status - click to inspect or configure"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">
+                  {dbStatus === 'connected'
+                    ? 'Cloud DB Live'
+                    : dbStatus === 'syncing'
+                    ? 'Syncing...'
+                    : dbStatus === 'needs_setup'
+                    ? 'DB Setup Needed'
+                    : 'Local Cache'}
+                </span>
+                <span className={`w-2 h-2 rounded-full ${
+                  dbStatus === 'connected'
+                    ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]'
+                    : dbStatus === 'syncing'
+                    ? 'bg-sky-400 animate-ping'
+                    : dbStatus === 'needs_setup'
+                    ? 'bg-amber-400'
+                    : 'bg-slate-500'
+                }`} />
+              </button>
+
               {/* Tour Filter (On dashboard when tours exist) */}
               {currentView === 'dashboard' && uniqueTours.length > 0 && (
                 <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200">
@@ -981,6 +1162,242 @@ export function App() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Database Status & Setup Modal */}
+        {showDbModal && (
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-base">Cloud Database (Supabase)</h3>
+                    <p className="text-xs text-slate-400">Multi-device real-time PostgreSQL synchronization</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDbModal(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4 my-4 text-xs">
+                {/* Connection Status Box */}
+                <div className={`p-4 rounded-xl border flex items-start gap-3 ${
+                  dbStatus === 'connected'
+                    ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300'
+                    : dbStatus === 'needs_setup'
+                    ? 'bg-amber-950/40 border-amber-600/60 text-amber-300'
+                    : 'bg-slate-800/60 border-slate-700 text-slate-300'
+                }`}>
+                  {dbStatus === 'connected' ? (
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  )}
+                  <div>
+                    <div className="font-bold text-sm">
+                      {dbStatus === 'connected'
+                        ? 'Cloud Database Connected & Live!'
+                        : dbStatus === 'needs_setup'
+                        ? 'Tables Need Setup in Supabase'
+                        : dbStatus === 'syncing'
+                        ? 'Syncing with Supabase...'
+                        : 'Offline Local Storage'}
+                    </div>
+                    <p className="mt-1 text-slate-300 text-xs leading-relaxed">
+                      {dbStatus === 'connected'
+                        ? 'Your data is being stored in PostgreSQL and synced in real time across all computers, tablets, and phones.'
+                        : dbStatus === 'needs_setup'
+                        ? 'Connected to your Supabase project (bjkvvfbzxprbqxoddtvm), but the Tour tables (tour_tours, tour_registrations, tour_transactions) are not created yet.'
+                        : 'Currently operating in fast local offline mode.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Project Details */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Target Project:</span>
+                    <span className="font-mono text-white text-[11px] bg-slate-900 px-2 py-0.5 rounded">
+                      bjkvvfbzxprbqxoddtvm.supabase.co
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Database Engine:</span>
+                    <span className="text-slate-200 font-semibold">PostgreSQL (Supabase)</span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Real-time Sync:</span>
+                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span>Tables Managed:</span>
+                    <span className="text-slate-200">tour_tours, tour_registrations, tour_transactions</span>
+                  </div>
+                </div>
+
+                {/* SQL Setup Instructions (if needed) */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="font-bold text-white text-xs flex items-center justify-between">
+                    <span>1-Step SQL Schema Setup:</span>
+                    <a
+                      href="https://supabase.com/dashboard/project/bjkvvfbzxprbqxoddtvm/sql/new"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold"
+                    >
+                      Open Supabase SQL Editor <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                  <p className="text-slate-400 text-xs">
+                    To enable database storage, paste the SQL schema into the Supabase SQL editor and click <strong>Run</strong>:
+                  </p>
+                  <button
+                    onClick={() => {
+                      const sql = `-- 1. Tours Table
+CREATE TABLE IF NOT EXISTS public.tour_tours (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  code TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  start_date TEXT NOT NULL,
+  end_date TEXT NOT NULL,
+  default_fee NUMERIC NOT NULL DEFAULT 0,
+  budget NUMERIC NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'planning',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 2. Registrations Table
+CREATE TABLE IF NOT EXISTS public.tour_registrations (
+  id TEXT PRIMARY KEY,
+  registration_number TEXT NOT NULL,
+  full_name TEXT NOT NULL,
+  gender TEXT,
+  age INTEGER,
+  date_of_birth TEXT,
+  phone_number TEXT NOT NULL,
+  whatsapp_number TEXT,
+  address TEXT,
+  tour_name TEXT NOT NULL,
+  registration_date TEXT NOT NULL,
+  agreed_fee NUMERIC NOT NULL DEFAULT 0,
+  paid_amount NUMERIC NOT NULL DEFAULT 0,
+  due_amount NUMERIC NOT NULL DEFAULT 0,
+  refund_amount NUMERIC DEFAULT 0,
+  refund_status TEXT DEFAULT 'not_refunded',
+  refund_reason TEXT,
+  refund_date TEXT,
+  refund_method TEXT,
+  payment_method TEXT NOT NULL DEFAULT 'Cash',
+  seat_number TEXT,
+  vehicle_name TEXT,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'unpaid',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 3. Financial Transactions Table
+CREATE TABLE IF NOT EXISTS public.tour_transactions (
+  id TEXT PRIMARY KEY,
+  type TEXT NOT NULL,
+  tour_id TEXT NOT NULL,
+  tour_name TEXT NOT NULL,
+  party_name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  amount NUMERIC NOT NULL DEFAULT 0,
+  date TEXT NOT NULL,
+  payment_method TEXT NOT NULL DEFAULT 'Cash',
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'completed',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.tour_tours ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tour_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow anon on tour_tours" ON public.tour_tours FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon on tour_registrations" ON public.tour_registrations FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "Allow anon on tour_transactions" ON public.tour_transactions FOR ALL TO anon USING (true) WITH CHECK (true);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_tours') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_tours;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_registrations') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_registrations;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_transactions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_transactions;
+  END IF;
+END $$;`;
+                      navigator.clipboard.writeText(sql);
+                      setCopiedSql(true);
+                      setTimeout(() => setCopiedSql(false), 3000);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-all border border-slate-700 cursor-pointer"
+                  >
+                    {copiedSql ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-400">SQL Copied to Clipboard!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-orange-400" />
+                        <span>Copy Complete SQL Schema</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+                <button
+                  onClick={async () => {
+                    setDbStatus('syncing');
+                    const [remoteTours, remoteRegs, remoteTxs] = await Promise.all([
+                      fetchToursFromDb(),
+                      fetchRegistrationsFromDb(),
+                      fetchTransactionsFromDb(),
+                    ]);
+                    if (remoteTours === null && remoteRegs === null && remoteTxs === null) {
+                      setDbStatus('needs_setup');
+                    } else {
+                      if (remoteTours && remoteTours.length > 0) setTours(remoteTours);
+                      if (remoteRegs && remoteRegs.length > 0) setRegistrations(remoteRegs);
+                      if (remoteTxs && remoteTxs.length > 0) setTransactions(remoteTxs);
+                      setDbStatus('connected');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Check & Refresh Connection</span>
+                </button>
+                <button
+                  onClick={() => setShowDbModal(false)}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}
