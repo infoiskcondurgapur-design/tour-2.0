@@ -1,17 +1,65 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Tour, PassengerRegistration, FinancialTransaction } from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://bjkvvfbzxprbqxoddtvm.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqa3Z2ZmJ6eHByYnF4b2RkdHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNTc5ODUsImV4cCI6MjEwNzYzMzk4NX0.58r4Q9clZ6XMP8vg0j0S2Q4NMwZ5UcnvzqNyiAwPuaU';
+const DEFAULT_URL = import.meta.env.VITE_SUPABASE_URL || 'https://bjkvvfbzxprbqxoddtvm.supabase.co';
+const DEFAULT_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqa3Z2ZmJ6eHByYnF4b2RkdHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNTc5ODUsImV4cCI6MjEwNzYzMzk4NX0.58r4Q9clZ6XMP8vg0j0S2Q4NMwZ5UcnvzqNyiAwPuaU';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+let cachedClient: SupabaseClient | null = null;
+let currentClientKey = '';
 
-export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl, supabaseAnonKey, {
+export function getActiveSupabaseConfig() {
+  const customUrl = typeof window !== 'undefined' ? localStorage.getItem('tour_supabase_custom_url') : null;
+  const customKey = typeof window !== 'undefined' ? localStorage.getItem('tour_supabase_custom_key') : null;
+
+  return {
+    url: customUrl?.trim() || DEFAULT_URL,
+    key: customKey?.trim() || DEFAULT_KEY,
+    isCustom: Boolean(customUrl && customKey),
+  };
+}
+
+export function getActiveSupabaseClient(): SupabaseClient | null {
+  const { url, key } = getActiveSupabaseConfig();
+  if (!url || !key) return null;
+
+  const keyCombo = `${url}::${key}`;
+  if (cachedClient && currentClientKey === keyCombo) {
+    return cachedClient;
+  }
+
+  try {
+    cachedClient = createClient(url, key, {
       auth: { persistSession: false },
       realtime: { params: { eventsPerSecond: 10 } }
-    })
-  : null;
+    });
+    currentClientKey = keyCombo;
+    return cachedClient;
+  } catch (e) {
+    console.error('Failed to create Supabase client:', e);
+    return null;
+  }
+}
+
+export const isSupabaseConfigured = Boolean(DEFAULT_URL && DEFAULT_KEY);
+export const supabase = getActiveSupabaseClient();
+
+export function setCustomSupabaseCredentials(url: string, key: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('tour_supabase_custom_url', url.trim());
+    localStorage.setItem('tour_supabase_custom_key', key.trim());
+  }
+  cachedClient = null;
+  currentClientKey = '';
+}
+
+export function clearCustomSupabaseCredentials() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('tour_supabase_custom_url');
+    localStorage.removeItem('tour_supabase_custom_key');
+  }
+  cachedClient = null;
+  currentClientKey = '';
+}
 
 // =========================================================================
 // Mappers: Domain <-> DB Rows
@@ -145,9 +193,10 @@ export function txFromDb(r: any): FinancialTransaction {
 // =========================================================================
 
 export async function fetchToursFromDb(): Promise<Tour[] | null> {
-  if (!supabase) return null;
+  const client = getActiveSupabaseClient();
+  if (!client) return null;
   try {
-    const { data, error } = await supabase.from('tour_tours').select('*').order('created_at', { ascending: false });
+    const { data, error } = await client.from('tour_tours').select('*').order('created_at', { ascending: false });
     if (error) {
       console.warn('Supabase fetch tours error:', error.message);
       return null;
@@ -160,9 +209,10 @@ export async function fetchToursFromDb(): Promise<Tour[] | null> {
 }
 
 export async function upsertTourInDb(tour: Tour): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase.from('tour_tours').upsert(tourToDb(tour), { onConflict: 'id' });
+    const { error } = await client.from('tour_tours').upsert(tourToDb(tour), { onConflict: 'id' });
     if (error) {
       console.error('Supabase upsert tour error:', error.message);
       return false;
@@ -175,9 +225,10 @@ export async function upsertTourInDb(tour: Tour): Promise<boolean> {
 }
 
 export async function deleteTourFromDb(tourId: string): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase.from('tour_tours').delete().eq('id', tourId);
+    const { error } = await client.from('tour_tours').delete().eq('id', tourId);
     if (error) {
       console.error('Supabase delete tour error:', error.message);
       return false;
@@ -190,9 +241,10 @@ export async function deleteTourFromDb(tourId: string): Promise<boolean> {
 }
 
 export async function fetchRegistrationsFromDb(): Promise<PassengerRegistration[] | null> {
-  if (!supabase) return null;
+  const client = getActiveSupabaseClient();
+  if (!client) return null;
   try {
-    const { data, error } = await supabase.from('tour_registrations').select('*').order('created_at', { ascending: false });
+    const { data, error } = await client.from('tour_registrations').select('*').order('created_at', { ascending: false });
     if (error) {
       console.warn('Supabase fetch registrations error:', error.message);
       return null;
@@ -205,9 +257,10 @@ export async function fetchRegistrationsFromDb(): Promise<PassengerRegistration[
 }
 
 export async function upsertRegistrationInDb(reg: PassengerRegistration): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase.from('tour_registrations').upsert(regToDb(reg), { onConflict: 'id' });
+    const { error } = await client.from('tour_registrations').upsert(regToDb(reg), { onConflict: 'id' });
     if (error) {
       console.error('Supabase upsert registration error:', error.message);
       return false;
@@ -220,9 +273,10 @@ export async function upsertRegistrationInDb(reg: PassengerRegistration): Promis
 }
 
 export async function deleteRegistrationFromDb(regId: string): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase.from('tour_registrations').delete().eq('id', regId);
+    const { error } = await client.from('tour_registrations').delete().eq('id', regId);
     if (error) {
       console.error('Supabase delete registration error:', error.message);
       return false;
@@ -235,9 +289,10 @@ export async function deleteRegistrationFromDb(regId: string): Promise<boolean> 
 }
 
 export async function fetchTransactionsFromDb(): Promise<FinancialTransaction[] | null> {
-  if (!supabase) return null;
+  const client = getActiveSupabaseClient();
+  if (!client) return null;
   try {
-    const { data, error } = await supabase.from('tour_transactions').select('*').order('created_at', { ascending: false });
+    const { data, error } = await client.from('tour_transactions').select('*').order('created_at', { ascending: false });
     if (error) {
       console.warn('Supabase fetch transactions error:', error.message);
       return null;
@@ -250,9 +305,10 @@ export async function fetchTransactionsFromDb(): Promise<FinancialTransaction[] 
 }
 
 export async function upsertTransactionInDb(tx: FinancialTransaction): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase.from('tour_transactions').upsert(txToDb(tx), { onConflict: 'id' });
+    const { error } = await client.from('tour_transactions').upsert(txToDb(tx), { onConflict: 'id' });
     if (error) {
       console.error('Supabase upsert transaction error:', error.message);
       return false;
@@ -265,9 +321,10 @@ export async function upsertTransactionInDb(tx: FinancialTransaction): Promise<b
 }
 
 export async function deleteTransactionFromDb(txId: string): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase.from('tour_transactions').delete().eq('id', txId);
+    const { error } = await client.from('tour_transactions').delete().eq('id', txId);
     if (error) {
       console.error('Supabase delete transaction error:', error.message);
       return false;
@@ -279,11 +336,12 @@ export async function deleteTransactionFromDb(txId: string): Promise<boolean> {
   }
 }
 
-// Batch delete transactions by tourId and partyName (used when a pilgrim is deleted)
+// Batch delete transactions by tourName and partyName (used when a pilgrim is deleted)
 export async function deleteTransactionsForPassengerInDb(tourName: string, passengerName: string): Promise<boolean> {
-  if (!supabase) return false;
+  const client = getActiveSupabaseClient();
+  if (!client) return false;
   try {
-    const { error } = await supabase
+    const { error } = await client
       .from('tour_transactions')
       .delete()
       .eq('tour_name', tourName)

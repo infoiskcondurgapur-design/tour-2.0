@@ -43,7 +43,10 @@ import {
   fetchTransactionsFromDb,
   upsertTransactionInDb,
   deleteTransactionFromDb,
-  deleteTransactionsForPassengerInDb
+  deleteTransactionsForPassengerInDb,
+  getActiveSupabaseConfig,
+  setCustomSupabaseCredentials,
+  clearCustomSupabaseCredentials
 } from './lib/supabase';
 
 const TX_STORAGE_KEY = 'real_finance_dashboard_data_v1';
@@ -90,6 +93,9 @@ export function App() {
   const [dbStatus, setDbStatus] = useState<'connected' | 'syncing' | 'offline' | 'needs_setup'>('syncing');
   const [showDbModal, setShowDbModal] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [customUrlInput, setCustomUrlInput] = useState(() => getActiveSupabaseConfig().url);
+  const [customKeyInput, setCustomKeyInput] = useState(() => getActiveSupabaseConfig().key);
+  const [showCredentialInputs, setShowCredentialInputs] = useState(false);
 
   // Cloud Database (Supabase) Sync & Realtime Listener
   useEffect(() => {
@@ -1227,7 +1233,7 @@ export function App() {
                   <div className="flex justify-between items-center text-slate-400">
                     <span>Target Project:</span>
                     <span className="font-mono text-white text-[11px] bg-slate-900 px-2 py-0.5 rounded">
-                      bjkvvfbzxprbqxoddtvm.supabase.co
+                      {getActiveSupabaseConfig().url.replace('https://', '')}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-slate-400">
@@ -1237,13 +1243,89 @@ export function App() {
                   <div className="flex justify-between items-center text-slate-400">
                     <span>Real-time Sync:</span>
                     <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Active
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Ready
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-slate-400">
-                    <span>Tables Managed:</span>
-                    <span className="text-slate-200">tour_tours, tour_registrations, tour_transactions</span>
+                </div>
+
+                {/* Custom Project Switcher */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white text-xs">Supabase Credentials:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowCredentialInputs(!showCredentialInputs)}
+                      className="text-[11px] text-orange-400 hover:text-orange-300 font-bold cursor-pointer"
+                    >
+                      {showCredentialInputs ? 'Close' : 'Change Project / Keys'}
+                    </button>
                   </div>
+
+                  {showCredentialInputs && (
+                    <div className="space-y-2 pt-2 border-t border-slate-800">
+                      <p className="text-[11px] text-slate-400">
+                        If you created a new/separate Supabase project, paste its URL and Anon key below:
+                      </p>
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Project URL</label>
+                        <input
+                          type="text"
+                          value={customUrlInput}
+                          onChange={(e) => setCustomUrlInput(e.target.value)}
+                          placeholder="https://xyzcompany.supabase.co"
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Anon Public Key</label>
+                        <input
+                          type="text"
+                          value={customKeyInput}
+                          onChange={(e) => setCustomKeyInput(e.target.value)}
+                          placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setCustomSupabaseCredentials(customUrlInput, customKeyInput);
+                            setDbStatus('syncing');
+                            const [remoteTours, remoteRegs, remoteTxs] = await Promise.all([
+                              fetchToursFromDb(),
+                              fetchRegistrationsFromDb(),
+                              fetchTransactionsFromDb(),
+                            ]);
+                            if (remoteTours === null && remoteRegs === null && remoteTxs === null) {
+                              setDbStatus('needs_setup');
+                            } else {
+                              if (remoteTours && remoteTours.length > 0) setTours(remoteTours);
+                              if (remoteRegs && remoteRegs.length > 0) setRegistrations(remoteRegs);
+                              if (remoteTxs && remoteTxs.length > 0) setTransactions(remoteTxs);
+                              setDbStatus('connected');
+                            }
+                            setShowCredentialInputs(false);
+                          }}
+                          className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-[11px] font-bold cursor-pointer"
+                        >
+                          Save & Connect
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            clearCustomSupabaseCredentials();
+                            setCustomUrlInput(getActiveSupabaseConfig().url);
+                            setCustomKeyInput(getActiveSupabaseConfig().key);
+                            setShowCredentialInputs(false);
+                          }}
+                          className="px-2.5 py-1 border border-slate-700 text-slate-400 hover:text-white rounded-lg text-[11px]"
+                        >
+                          Reset to Default
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* SQL Setup Instructions (if needed) */}
@@ -1251,7 +1333,7 @@ export function App() {
                   <div className="font-bold text-white text-xs flex items-center justify-between">
                     <span>1-Step SQL Schema Setup:</span>
                     <a
-                      href="https://supabase.com/dashboard/project/bjkvvfbzxprbqxoddtvm/sql/new"
+                      href={`${getActiveSupabaseConfig().url.replace('.supabase.co', '') !== getActiveSupabaseConfig().url ? `https://supabase.com/dashboard/project/${getActiveSupabaseConfig().url.replace('https://', '').replace('.supabase.co', '')}/sql/new` : 'https://supabase.com/dashboard'}`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold"
@@ -1260,11 +1342,11 @@ export function App() {
                     </a>
                   </div>
                   <p className="text-slate-400 text-xs">
-                    To enable database storage, paste the SQL schema into the Supabase SQL editor and click <strong>Run</strong>:
+                    Paste this SQL schema into your Supabase SQL editor and click <strong>Run</strong>:
                   </p>
                   <button
                     onClick={() => {
-                      const sql = `-- 1. Tours Table
+                      const sql = `-- 1. Create Tables
 CREATE TABLE IF NOT EXISTS public.tour_tours (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -1280,7 +1362,6 @@ CREATE TABLE IF NOT EXISTS public.tour_tours (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 2. Registrations Table
 CREATE TABLE IF NOT EXISTS public.tour_registrations (
   id TEXT PRIMARY KEY,
   registration_number TEXT NOT NULL,
@@ -1310,7 +1391,6 @@ CREATE TABLE IF NOT EXISTS public.tour_registrations (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 3. Financial Transactions Table
 CREATE TABLE IF NOT EXISTS public.tour_transactions (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
@@ -1327,16 +1407,18 @@ CREATE TABLE IF NOT EXISTS public.tour_transactions (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Grants for PostgREST & API roles
+-- 2. Grants for PostgREST & Anon API
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.tour_tours TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.tour_registrations TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.tour_transactions TO anon, authenticated, service_role;
 
+-- 3. Enable Row Level Security (RLS)
 ALTER TABLE public.tour_tours ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_registrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tour_transactions ENABLE ROW LEVEL SECURITY;
 
+-- 4. Policies
 DROP POLICY IF EXISTS "Allow anon on tour_tours" ON public.tour_tours;
 CREATE POLICY "Allow anon on tour_tours" ON public.tour_tours FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
@@ -1346,19 +1428,7 @@ CREATE POLICY "Allow anon on tour_registrations" ON public.tour_registrations FO
 DROP POLICY IF EXISTS "Allow anon on tour_transactions" ON public.tour_transactions;
 CREATE POLICY "Allow anon on tour_transactions" ON public.tour_transactions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_tours') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_tours;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_registrations') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_registrations;
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tour_transactions') THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.tour_transactions;
-  END IF;
-END $$;
-
+-- 5. Reload Schema Cache
 NOTIFY pgrst, 'reload schema';`;
                       navigator.clipboard.writeText(sql);
                       setCopiedSql(true);
