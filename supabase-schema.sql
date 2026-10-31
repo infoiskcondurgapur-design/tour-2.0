@@ -1,6 +1,6 @@
 -- =========================================================================
 -- ISKCON Tour 2.0 Database Schema for Supabase
--- Project: https://supabase.com/dashboard/project/bjkvvfbzxprbqxoddtvm/sql/new
+-- Project: https://supabase.com/dashboard/project/mjwmheedvdabxhsihixc/sql/new
 -- =========================================================================
 
 -- 1. Create Tables

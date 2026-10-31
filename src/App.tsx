@@ -1222,7 +1222,7 @@ export function App() {
                       {dbStatus === 'connected'
                         ? 'Your data is being stored in PostgreSQL and synced in real time across all computers, tablets, and phones.'
                         : dbStatus === 'needs_setup'
-                        ? 'Connected to your Supabase project (bjkvvfbzxprbqxoddtvm), but the Tour tables (tour_tours, tour_registrations, tour_transactions) are not created yet.'
+                        ? `Connected to your Supabase project (${getActiveSupabaseConfig().url.replace('https://', '').replace('.supabase.co', '')}), but the Tour tables (tour_tours, tour_registrations, tour_transactions) are not created yet.`
                         : 'Currently operating in fast local offline mode.'}
                     </p>
                   </div>
@@ -1232,7 +1232,7 @@ export function App() {
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
                   <div className="flex justify-between items-center text-slate-400">
                     <span>Target Project:</span>
-                    <span className="font-mono text-white text-[11px] bg-slate-900 px-2 py-0.5 rounded">
+                    <span className="font-mono text-white text-[11px] bg-slate-900 px-2 py-0.5 rounded font-bold text-orange-400">
                       {getActiveSupabaseConfig().url.replace('https://', '')}
                     </span>
                   </div>
@@ -1248,92 +1248,99 @@ export function App() {
                   </div>
                 </div>
 
-                {/* Custom Project Switcher */}
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2.5">
+                {/* Supabase Project Credentials Setup */}
+                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white text-xs">Supabase Credentials:</span>
-                    <button
-                      type="button"
-                      onClick={() => setShowCredentialInputs(!showCredentialInputs)}
-                      className="text-[11px] text-orange-400 hover:text-orange-300 font-bold cursor-pointer"
+                    <div>
+                      <span className="font-bold text-white text-xs block">Supabase Connection Credentials</span>
+                      <span className="text-[11px] text-slate-400">Enter Project URL and Anon API Key for Tour 2.0</span>
+                    </div>
+                    <a
+                      href={`https://supabase.com/dashboard/project/${getActiveSupabaseConfig().url.replace('https://', '').replace('.supabase.co', '')}/settings/api`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-orange-400 hover:text-orange-300 font-bold flex items-center gap-1 bg-orange-500/10 px-2 py-1 rounded-lg border border-orange-500/30"
                     >
-                      {showCredentialInputs ? 'Close' : 'Change Project / Keys'}
-                    </button>
+                      Get API Key <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
 
-                  {showCredentialInputs && (
-                    <div className="space-y-2 pt-2 border-t border-slate-800">
-                      <p className="text-[11px] text-slate-400">
-                        If you created a new/separate Supabase project, paste its URL and Anon key below:
-                      </p>
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Project URL</label>
-                        <input
-                          type="text"
-                          value={customUrlInput}
-                          onChange={(e) => setCustomUrlInput(e.target.value)}
-                          placeholder="https://xyzcompany.supabase.co"
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-orange-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Anon Public Key</label>
-                        <input
-                          type="text"
-                          value={customKeyInput}
-                          onChange={(e) => setCustomKeyInput(e.target.value)}
-                          placeholder="eyJhbGciOiJIUzI1NiIsIn..."
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-orange-500"
-                        />
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setCustomSupabaseCredentials(customUrlInput, customKeyInput);
-                            setDbStatus('syncing');
-                            const [remoteTours, remoteRegs, remoteTxs] = await Promise.all([
-                              fetchToursFromDb(),
-                              fetchRegistrationsFromDb(),
-                              fetchTransactionsFromDb(),
-                            ]);
-                            if (remoteTours === null && remoteRegs === null && remoteTxs === null) {
-                              setDbStatus('needs_setup');
-                            } else {
-                              if (remoteTours && remoteTours.length > 0) setTours(remoteTours);
-                              if (remoteRegs && remoteRegs.length > 0) setRegistrations(remoteRegs);
-                              if (remoteTxs && remoteTxs.length > 0) setTransactions(remoteTxs);
-                              setDbStatus('connected');
-                            }
-                            setShowCredentialInputs(false);
-                          }}
-                          className="px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-[11px] font-bold cursor-pointer"
-                        >
-                          Save & Connect
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            clearCustomSupabaseCredentials();
-                            setCustomUrlInput(getActiveSupabaseConfig().url);
-                            setCustomKeyInput(getActiveSupabaseConfig().key);
-                            setShowCredentialInputs(false);
-                          }}
-                          className="px-2.5 py-1 border border-slate-700 text-slate-400 hover:text-white rounded-lg text-[11px]"
-                        >
-                          Reset to Default
-                        </button>
-                      </div>
+                  <div className="space-y-2.5 pt-1">
+                    <div>
+                      <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Project URL</label>
+                      <input
+                        type="text"
+                        value={customUrlInput}
+                        onChange={(e) => setCustomUrlInput(e.target.value)}
+                        placeholder="https://mjwmheedvdabxhsihixc.supabase.co"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-orange-500"
+                      />
                     </div>
-                  )}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-[10px] uppercase font-bold text-slate-400">Anon Public Key (Required)</label>
+                        <a
+                          href={`https://supabase.com/dashboard/project/${getActiveSupabaseConfig().url.replace('https://', '').replace('.supabase.co', '')}/settings/api`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[10px] text-sky-400 hover:underline"
+                        >
+                          Find in Supabase → Settings → API
+                        </a>
+                      </div>
+                      <input
+                        type="text"
+                        value={customKeyInput}
+                        onChange={(e) => setCustomKeyInput(e.target.value)}
+                        placeholder="Paste your anon public key (starts with eyJ...)"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setCustomSupabaseCredentials(customUrlInput, customKeyInput);
+                          setDbStatus('syncing');
+                          const [remoteTours, remoteRegs, remoteTxs] = await Promise.all([
+                            fetchToursFromDb(),
+                            fetchRegistrationsFromDb(),
+                            fetchTransactionsFromDb(),
+                          ]);
+                          if (remoteTours === null && remoteRegs === null && remoteTxs === null) {
+                            setDbStatus('needs_setup');
+                          } else {
+                            if (remoteTours && remoteTours.length > 0) setTours(remoteTours);
+                            if (remoteRegs && remoteRegs.length > 0) setRegistrations(remoteRegs);
+                            if (remoteTxs && remoteTxs.length > 0) setTransactions(remoteTxs);
+                            setDbStatus('connected');
+                          }
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-lg text-xs font-bold cursor-pointer shadow-md shadow-orange-500/20"
+                      >
+                        Save & Connect
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearCustomSupabaseCredentials();
+                          setCustomUrlInput('https://mjwmheedvdabxhsihixc.supabase.co');
+                          setCustomKeyInput('');
+                        }}
+                        className="px-3 py-2 border border-slate-700 text-slate-400 hover:text-white rounded-lg text-xs"
+                      >
+                        Reset Defaults
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* SQL Setup Instructions (if needed) */}
+                {/* SQL Setup Instructions */}
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
                   <div className="font-bold text-white text-xs flex items-center justify-between">
                     <span>1-Step SQL Schema Setup:</span>
                     <a
-                      href={`${getActiveSupabaseConfig().url.replace('.supabase.co', '') !== getActiveSupabaseConfig().url ? `https://supabase.com/dashboard/project/${getActiveSupabaseConfig().url.replace('https://', '').replace('.supabase.co', '')}/sql/new` : 'https://supabase.com/dashboard'}`}
+                      href={`https://supabase.com/dashboard/project/${getActiveSupabaseConfig().url.replace('https://', '').replace('.supabase.co', '')}/sql/new`}
                       target="_blank"
                       rel="noreferrer"
                       className="text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold"
