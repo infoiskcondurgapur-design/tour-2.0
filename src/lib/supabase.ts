@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Tour, PassengerRegistration, FinancialTransaction } from '../types';
 
 const DEFAULT_URL = import.meta.env.VITE_SUPABASE_URL || 'https://mjwmheedvdabxhsihixc.supabase.co';
-const DEFAULT_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqa3Z2ZmJ6eHByYnF4b2RkdHZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwNTc5ODUsImV4cCI6MjEwNzYzMzk4NX0.58r4Q9clZ6XMP8vg0j0S2Q4NMwZ5UcnvzqNyiAwPuaU';
+const DEFAULT_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qd21oZWVkdmRhYnhoc2loaXhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDUxNjEsImV4cCI6MjEwODkyMTE2MX0.BbCnFJy2aIVOFo9i7Yb_KW8_9H4OY5BJgq8KZ4qaeRg';
 
 let cachedClient: SupabaseClient | null = null;
 let currentClientKey = '';
