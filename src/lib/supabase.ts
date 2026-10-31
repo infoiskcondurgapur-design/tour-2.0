@@ -8,6 +8,15 @@ let cachedClient: SupabaseClient | null = null;
 let currentClientKey = '';
 
 export function getActiveSupabaseConfig() {
+  if (typeof window !== 'undefined') {
+    const customUrl = localStorage.getItem('tour_supabase_custom_url');
+    // Clear old project reference if cached in browser
+    if (customUrl && customUrl.includes('bjkvvfbzxprbqxoddtvm')) {
+      localStorage.removeItem('tour_supabase_custom_url');
+      localStorage.removeItem('tour_supabase_custom_key');
+    }
+  }
+
   const customUrl = typeof window !== 'undefined' ? localStorage.getItem('tour_supabase_custom_url') : null;
   const customKey = typeof window !== 'undefined' ? localStorage.getItem('tour_supabase_custom_key') : null;
 

@@ -45,6 +45,7 @@ import {
   deleteTransactionFromDb,
   deleteTransactionsForPassengerInDb,
   getActiveSupabaseConfig,
+  getActiveSupabaseClient,
   setCustomSupabaseCredentials,
   clearCustomSupabaseCredentials
 } from './lib/supabase';
@@ -102,7 +103,8 @@ export function App() {
     let isMounted = true;
 
     async function syncCloudData() {
-      if (!supabase || !isSupabaseConfigured) {
+      const client = getActiveSupabaseClient();
+      if (!client || !isSupabaseConfigured) {
         if (isMounted) setDbStatus('offline');
         return;
       }
@@ -117,45 +119,39 @@ export function App() {
 
         if (!isMounted) return;
 
-        // If all 3 returned null, tables do not exist yet on Supabase
-        if (remoteTours === null && remoteRegs === null && remoteTxs === null) {
+        // If any return null, tables do not exist yet on Supabase
+        if (remoteTours === null || remoteRegs === null || remoteTxs === null) {
           setDbStatus('needs_setup');
           return;
         }
 
         // 1. Sync Tours
-        if (remoteTours !== null) {
-          if (remoteTours.length > 0) {
-            setTours(remoteTours);
-          } else if (tours.length > 0) {
-            // Push existing local tours to cloud
-            for (const t of tours) {
-              await upsertTourInDb(t);
-            }
+        if (remoteTours.length > 0) {
+          setTours(remoteTours);
+        } else if (tours.length > 0) {
+          // Push existing local tours to cloud
+          for (const t of tours) {
+            await upsertTourInDb(t);
           }
         }
 
         // 2. Sync Registrations
-        if (remoteRegs !== null) {
-          if (remoteRegs.length > 0) {
-            setRegistrations(remoteRegs);
-          } else if (registrations.length > 0) {
-            // Push existing local registrations to cloud
-            for (const r of registrations) {
-              await upsertRegistrationInDb(r);
-            }
+        if (remoteRegs.length > 0) {
+          setRegistrations(remoteRegs);
+        } else if (registrations.length > 0) {
+          // Push existing local registrations to cloud
+          for (const r of registrations) {
+            await upsertRegistrationInDb(r);
           }
         }
 
         // 3. Sync Transactions
-        if (remoteTxs !== null) {
-          if (remoteTxs.length > 0) {
-            setTransactions(remoteTxs);
-          } else if (transactions.length > 0) {
-            // Push existing local transactions to cloud
-            for (const tx of transactions) {
-              await upsertTransactionInDb(tx);
-            }
+        if (remoteTxs.length > 0) {
+          setTransactions(remoteTxs);
+        } else if (transactions.length > 0) {
+          // Push existing local transactions to cloud
+          for (const tx of transactions) {
+            await upsertTransactionInDb(tx);
           }
         }
 
@@ -169,8 +165,9 @@ export function App() {
     syncCloudData();
 
     // Subscribe to realtime changes so all devices stay in sync
-    if (supabase) {
-      const channel = supabase
+    const activeClient = getActiveSupabaseClient();
+    if (activeClient) {
+      const channel = activeClient
         .channel('realtime_tour_channel')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'tour_tours' }, async () => {
           const fresh = await fetchToursFromDb();
@@ -188,7 +185,7 @@ export function App() {
 
       return () => {
         isMounted = false;
-        supabase?.removeChannel(channel);
+        activeClient.removeChannel(channel);
       };
     }
 
