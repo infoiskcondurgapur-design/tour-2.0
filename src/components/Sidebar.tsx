@@ -6,12 +6,13 @@ import {
   ChevronLeft, 
   ChevronRight,
   Users,
-  Armchair
+  Armchair,
+  Globe
 } from 'lucide-react';
 
 interface SidebarProps {
-  currentView: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats';
-  setCurrentView: (view: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats') => void;
+  currentView: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register';
+  setCurrentView: (view: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register') => void;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   totalEarning: number;
@@ -70,6 +71,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Seat Allocation',
       icon: Armchair,
       badge: allocatedSeatsCount > 0 ? `${allocatedSeatsCount}` : null,
+    },
+    {
+      id: 'public_register' as const,
+      label: 'Devotee Portal',
+      icon: Globe,
+      badge: 'Public',
     },
   ];
 

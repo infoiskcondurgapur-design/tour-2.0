@@ -23,7 +23,8 @@ import {
   RefreshCw,
   ExternalLink,
   Copy,
-  Check
+  Check,
+  Globe
 } from 'lucide-react';
 import { FinancialTransaction, TransactionType, PassengerRegistration, Tour, TourStatus, RefundStatus } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -31,6 +32,7 @@ import { RegistrationView } from './components/RegistrationView';
 import { PassengersRosterView } from './components/PassengersRosterView';
 import { ToursView } from './components/ToursView';
 import { SeatAllocationView } from './components/SeatAllocationView';
+import { PublicRegistrationView } from './components/PublicRegistrationView';
 import { 
   supabase, 
   isSupabaseConfigured,
@@ -54,8 +56,25 @@ const TX_STORAGE_KEY = 'real_finance_dashboard_data_v1';
 const REG_STORAGE_KEY = 'real_finance_registrations_v1';
 const TOURS_STORAGE_KEY = 'real_finance_tours_v1';
 
+export type AppViewType = 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register';
+
 export function App() {
-  const [currentView, setCurrentView] = useState<'dashboard' | 'registration' | 'roster' | 'tours' | 'seats'>('dashboard');
+  const [currentView, setCurrentView] = useState<AppViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (
+        hash.startsWith('#/register') ||
+        hash.startsWith('#register') ||
+        search.includes('register=true') ||
+        search.includes('register=1') ||
+        (search.includes('tour=') && !search.includes('admin=true'))
+      ) {
+        return 'public_register';
+      }
+    }
+    return 'dashboard';
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -191,6 +210,30 @@ export function App() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  // Listen to URL hash and query param changes to route to/from public self-registration
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (
+        hash.startsWith('#/register') ||
+        hash.startsWith('#register') ||
+        search.includes('register=true') ||
+        search.includes('register=1') ||
+        (search.includes('tour=') && !search.includes('admin=true'))
+      ) {
+        setCurrentView('public_register');
+      }
+    };
+
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
     };
   }, []);
 
@@ -563,6 +606,21 @@ export function App() {
     }
   };
 
+  // If user or pilgrim is visiting the self-registration portal
+  if (currentView === 'public_register') {
+    return (
+      <PublicRegistrationView
+        tours={tours}
+        registrationsCount={registrations.length}
+        onAddRegistration={handleAddRegistration}
+        onSwitchToAdmin={() => {
+          window.location.hash = '';
+          setCurrentView('dashboard');
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans">
       {/* Desktop Sidebar */}
@@ -710,6 +768,19 @@ export function App() {
                   <Trash2 className="w-4 h-4" />
                 </button>
               )}
+
+              {/* Devotee Self-Registration Portal Quick Button */}
+              <button
+                onClick={() => {
+                  window.location.hash = '/register';
+                  setCurrentView('public_register');
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs sm:text-sm font-semibold border border-slate-700 transition-all cursor-pointer"
+                title="Open Devotee Self-Registration Portal"
+              >
+                <Globe className="w-3.5 h-3.5 text-orange-400" />
+                <span className="hidden sm:inline">Devotee Portal</span>
+              </button>
 
               {/* Add Entry Quick Button */}
               <button

@@ -13,7 +13,12 @@ import {
   Search,
   Wallet,
   CheckCircle2,
-  X
+  X,
+  Share2,
+  Copy,
+  Check,
+  Globe,
+  ExternalLink
 } from 'lucide-react';
 import { Tour, TourStatus, FinancialTransaction, PassengerRegistration } from '../types';
 
@@ -36,6 +41,26 @@ export const ToursView: React.FC<ToursViewProps> = ({
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [copiedTourName, setCopiedTourName] = useState<string | null>(null);
+
+  const getSelfRegLink = (tourName: string) => {
+    const origin = window.location.origin;
+    const pathname = window.location.pathname;
+    return `${origin}${pathname}#/register?tour=${encodeURIComponent(tourName)}`;
+  };
+
+  const handleCopyLink = (tourName: string) => {
+    const link = getSelfRegLink(tourName);
+    navigator.clipboard.writeText(link);
+    setCopiedTourName(tourName);
+    setTimeout(() => setCopiedTourName(null), 2500);
+  };
+
+  const getTourWhatsAppShareUrl = (tour: Tour) => {
+    const link = getSelfRegLink(tour.name);
+    const text = `🙏 *Hare Krishna!* Registration is now open for *${tour.name}* (${tour.destination}) from ${tour.startDate} to ${tour.endDate}.\n\n💰 *Tour Fee:* ${formatINR(tour.defaultFee)}\n🔗 *Register Online:* ${link}\n\nReserve your seat today!`;
+    return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+  };
 
   // Form State
   const [name, setName] = useState('');
@@ -246,6 +271,44 @@ export const ToursView: React.FC<ToursViewProps> = ({
                     <span className="text-[10px] text-rose-400 font-bold uppercase block">Due</span>
                     <span className="font-mono font-bold text-white text-sm">{formatINR(due)}</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Self-Registration Share Link Bar */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 text-slate-300">
+                  <Globe className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                  <span className="font-semibold text-[11px]">Self-Register Link:</span>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyLink(tour.name)}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-[11px] font-semibold border border-slate-700 transition-all cursor-pointer"
+                    title="Copy registration link for devotees"
+                  >
+                    {copiedTourName === tour.name ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-400">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3 text-orange-400" />
+                        <span>Copy Link</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href={getTourWhatsAppShareUrl(tour)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 rounded-lg text-[11px] font-semibold transition-all"
+                    title="Share link on WhatsApp"
+                  >
+                    <Share2 className="w-3 h-3" />
+                    <span>WhatsApp</span>
+                  </a>
                 </div>
               </div>
 
