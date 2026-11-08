@@ -21,6 +21,7 @@ import {
   Info
 } from 'lucide-react';
 import { PassengerRegistration, Tour } from '../types';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 
 interface PublicRegistrationViewProps {
   tours: Tour[];
@@ -276,14 +277,18 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onSwitchToAdmin}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-700/60 transition-all cursor-pointer"
-            title="Switch to Management Dashboard"
-          >
-            <span>Admin View</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <PwaInstallPrompt variant="button" />
+
+            <button
+              onClick={onSwitchToAdmin}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-semibold border border-slate-700/60 transition-all cursor-pointer"
+              title="Switch to Management Dashboard"
+            >
+              <span>Admin View</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </nav>
 

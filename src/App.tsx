@@ -33,6 +33,7 @@ import { PassengersRosterView } from './components/PassengersRosterView';
 import { ToursView } from './components/ToursView';
 import { SeatAllocationView } from './components/SeatAllocationView';
 import { PublicRegistrationView } from './components/PublicRegistrationView';
+import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { 
   supabase, 
   isSupabaseConfigured,
@@ -782,6 +783,9 @@ export function App() {
                 <span className="hidden sm:inline">Devotee Portal</span>
               </button>
 
+              {/* PWA Install Quick Button */}
+              <PwaInstallPrompt variant="button" />
+
               {/* Add Entry Quick Button */}
               <button
                 onClick={() => setIsModalOpen(true)}
@@ -833,6 +837,9 @@ export function App() {
             />
           ) : (
             <>
+              {/* PWA Install Promo Banner */}
+              <PwaInstallPrompt variant="banner" />
+
               {/* Net In-Hand Banner */}
               <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-800/80 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
                 <div>

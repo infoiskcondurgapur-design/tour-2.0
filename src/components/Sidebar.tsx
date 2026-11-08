@@ -9,6 +9,7 @@ import {
   Armchair,
   Globe
 } from 'lucide-react';
+import { PwaInstallPrompt } from './PwaInstallPrompt';
 
 interface SidebarProps {
   currentView: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register';
@@ -149,6 +150,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
       </div>
+
+      {/* PWA Install Button in Sidebar */}
+      {!collapsed && (
+        <div className="px-3 pb-1">
+          <PwaInstallPrompt variant="sidebar" />
+        </div>
+      )}
 
       {/* Mini Quick Stats Widget at bottom */}
       {!collapsed && (
