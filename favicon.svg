@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="needleLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- App Rounded Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect width="504" height="504" x="4" y="4" rx="108" fill="none" stroke="#f97316" stroke-width="2" stroke-opacity="0.3"/>
+
+  <!-- Outer Glow Ring -->
+  <circle cx="256" cy="256" r="195" fill="none" stroke="#f97316" stroke-width="2" stroke-opacity="0.3"/>
+  <circle cx="256" cy="256" r="185" fill="none" stroke="#f59e0b" stroke-width="6" stroke-opacity="0.9" filter="url(#glow)"/>
+
+  <!-- Inner Dial -->
+  <circle cx="256" cy="256" r="135" fill="#1e293b" fill-opacity="0.9" stroke="#fb923c" stroke-width="3"/>
+
+  <!-- Compass Star Needles -->
+  <!-- North (Orange/Gold) -->
+  <polygon points="256,70 286,256 256,256" fill="#f97316"/>
+  <polygon points="256,70 226,256 256,256" fill="#fb923c"/>
+
+  <!-- South -->
+  <polygon points="256,442 286,256 256,256" fill="#d97706"/>
+  <polygon points="256,442 226,256 256,256" fill="#f59e0b"/>
+
+  <!-- East -->
+  <polygon points="442,256 256,226 256,256" fill="#ea580c"/>
+  <polygon points="442,256 256,286 256,256" fill="#c2410c"/>
+
+  <!-- West -->
+  <polygon points="70,256 256,226 256,256" fill="#fb923c"/>
+  <polygon points="70,256 256,286 256,256" fill="#ea580c"/>
+
+  <!-- Center Pivot Core -->
+  <circle cx="256" cy="256" r="22" fill="#fef08a" stroke="#b45309" stroke-width="4"/>
+  <circle cx="256" cy="256" r="8" fill="#f59e0b"/>
+</svg>
