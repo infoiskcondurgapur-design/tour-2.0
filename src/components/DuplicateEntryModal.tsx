@@ -94,6 +94,12 @@ export const DuplicateEntryModal: React.FC<DuplicateEntryModalProps> = ({
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">Full Name</span>
                 <span className="text-white font-bold text-sm block truncate">{duplicate.fullName}</span>
               </div>
+              {duplicate.leaderName ? (
+                <div>
+                  <span className="text-slate-400 block text-[10px] uppercase font-semibold">Leader's Name</span>
+                  <span className="text-amber-300 font-bold text-sm block truncate">👑 {duplicate.leaderName}</span>
+                </div>
+              ) : null}
               <div>
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">Mobile Number</span>
                 <span className="text-white font-mono font-bold text-sm block">{duplicate.phoneNumber}</span>

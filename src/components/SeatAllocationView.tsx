@@ -440,6 +440,7 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
         const q = searchQuery.toLowerCase().trim();
         const match = (
           p.fullName.toLowerCase().includes(q) ||
+          (p.leaderName && p.leaderName.toLowerCase().includes(q)) ||
           p.phoneNumber.includes(q) ||
           p.registrationNumber.toLowerCase().includes(q) ||
           (p.seatNumber && p.seatNumber.toLowerCase().includes(q))
@@ -773,6 +774,11 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
                               <strong className="text-white text-sm">
                                 {pilgrim.fullName}
                               </strong>
+                              {pilgrim.leaderName && (
+                                <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1 rounded font-semibold truncate max-w-[120px]" title={`Leader: ${pilgrim.leaderName}`}>
+                                  👑 {pilgrim.leaderName}
+                                </span>
+                              )}
                               {onUpdateRegistration && (
                                 <button
                                   onClick={() => handleOpenPilgrimEdit(pilgrim)}

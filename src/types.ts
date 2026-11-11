@@ -69,6 +69,7 @@ export interface PassengerRegistration {
   id: string;
   registrationNumber: string;
   fullName: string;
+  leaderName?: string;
   gender?: GenderType;
   age?: number;
   dateOfBirth?: string;

@@ -19,7 +19,8 @@ import {
   UserCheck,
   ChevronRight,
   Info,
-  AlertTriangle
+  AlertTriangle,
+  Crown
 } from 'lucide-react';
 import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
@@ -79,6 +80,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   // Form State
   const [selectedTourName, setSelectedTourName] = useState<string>(defaultTour ? defaultTour.name : '');
   const [fullName, setFullName] = useState('');
+  const [leaderName, setLeaderName] = useState('');
   const [spiritualName, setSpiritualName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [dateOfBirth, setDateOfBirth] = useState('');
@@ -228,6 +230,9 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
     if (spiritualName.trim()) {
       finalNotes += `Spiritual Name: ${spiritualName.trim()} | `;
     }
+    if (leaderName.trim()) {
+      finalNotes += `Leader: ${leaderName.trim()} | `;
+    }
     if (emergencyContactName.trim() || emergencyContactPhone.trim()) {
       finalNotes += `Emergency: ${emergencyContactName.trim()} (${emergencyContactPhone.trim()}) | `;
     }
@@ -250,6 +255,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
       id: 'reg-' + Date.now(),
       registrationNumber: regNum,
       fullName: fullName.trim(),
+      leaderName: leaderName.trim() || undefined,
       gender,
       dateOfBirth: dateOfBirth || undefined,
       age: age ? Number(age) : undefined,
@@ -292,6 +298,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
     const text = `🙏 *Hare Krishna! ISKCON Durgapur Pilgrimage Registration*\n\n` +
       `✅ *Registration No:* ${reg.registrationNumber}\n` +
       `👤 *Pilgrim Name:* ${reg.fullName}\n` +
+      (reg.leaderName ? `👑 *Leader:* ${reg.leaderName}\n` : '') +
       `🚩 *Tour / Yatra:* ${reg.tourName}\n` +
       `📅 *Destination:* ${currentTourObj?.destination || 'Holy Dham'}\n` +
       `🗓️ *Dates:* ${currentTourObj?.startDate || ''} to ${currentTourObj?.endDate || ''}\n` +
@@ -308,6 +315,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   // Reset form to register another person
   const handleResetForAnother = () => {
     setFullName('');
+    setLeaderName('');
     setSpiritualName('');
     setDateOfBirth('');
     setAge('');
@@ -420,6 +428,15 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                       {completedRegistration.fullName}
                     </strong>
                   </div>
+                  {completedRegistration.leaderName && (
+                    <div>
+                      <span className="text-slate-400 text-xs block">Leader's Name / Group Leader:</span>
+                      <strong className="text-amber-300 font-bold flex items-center gap-1.5">
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        {completedRegistration.leaderName}
+                      </strong>
+                    </div>
+                  )}
                   <div>
                     <span className="text-slate-400 text-xs block">Contact Phone / WhatsApp:</span>
                     <strong className="text-slate-200 font-mono">
@@ -656,7 +673,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                     <div>
                       <label className="block text-slate-300 font-semibold mb-1">
                         Full Legal Name (as per Aadhaar/ID) *
@@ -672,8 +689,25 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                     </div>
 
                     <div>
+                      <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Crown className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Leader's Name (দলনেতা)</span>
+                        </span>
+                        <span className="text-[10px] text-amber-400 font-normal">Optional</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={leaderName}
+                        onChange={(e) => setLeaderName(e.target.value)}
+                        placeholder="e.g. HG Govinda Das / Self"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500"
+                      />
+                    </div>
+
+                    <div>
                       <label className="block text-slate-300 font-semibold mb-1">
-                        Spiritual / Initiated Name (Optional)
+                        Spiritual Name (Optional)
                       </label>
                       <input
                         type="text"

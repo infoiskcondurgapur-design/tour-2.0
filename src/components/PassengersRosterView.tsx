@@ -19,7 +19,8 @@ import {
   Edit3,
   UserCheck,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Crown
 } from 'lucide-react';
 import { PassengerRegistration, Tour, RefundStatus, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 
@@ -65,6 +66,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   // Edit Passenger Modal State
   const [editingTarget, setEditingTarget] = useState<PassengerRegistration | null>(null);
   const [editFullName, setEditFullName] = useState('');
+  const [editLeaderName, setEditLeaderName] = useState('');
   const [editGender, setEditGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [editDateOfBirth, setEditDateOfBirth] = useState('');
   const [editAge, setEditAge] = useState<number | ''>(45);
@@ -103,6 +105,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   const handleOpenEditModal = (reg: PassengerRegistration) => {
     setEditingTarget(reg);
     setEditFullName(reg.fullName);
+    setEditLeaderName(reg.leaderName || '');
     setEditGender(reg.gender || 'Male');
     setEditDateOfBirth(reg.dateOfBirth || '');
     setEditAge(reg.age ?? '');
@@ -180,6 +183,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     const updated: PassengerRegistration = {
       ...editingTarget,
       fullName: editFullName.trim(),
+      leaderName: editLeaderName.trim() || undefined,
       gender: editGender,
       dateOfBirth: editDateOfBirth || undefined,
       age: editAge !== '' ? Number(editAge) : undefined,
@@ -275,6 +279,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     if (q) {
       const matchQuery = (
         r.fullName.toLowerCase().includes(q) ||
+        (r.leaderName && r.leaderName.toLowerCase().includes(q)) ||
         r.tourName.toLowerCase().includes(q) ||
         r.phoneNumber.includes(q) ||
         r.registrationNumber.toLowerCase().includes(q)
@@ -514,6 +519,12 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                         {reg.registrationNumber}
                       </span>
                       <strong className="text-white text-sm">{reg.fullName}</strong>
+                      {reg.leaderName && (
+                        <span className="ml-2 inline-flex items-center gap-1 bg-amber-500/15 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded text-[10px] font-semibold" title={`Group Leader: ${reg.leaderName}`}>
+                          <Crown className="w-3 h-3 text-amber-400" />
+                          <span>Leader: {reg.leaderName}</span>
+                        </span>
+                      )}
                       <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
                         {reg.gender && <span className="font-medium text-slate-300">{reg.gender}</span>}
                         {reg.age && <span>• {reg.age} yrs</span>}
@@ -746,6 +757,22 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                       required
                       value={editFullName}
                       onChange={(e) => setEditFullName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Crown className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Leader's Name (দলনেতা)</span>
+                      </span>
+                      <span className="text-[10px] text-amber-400 font-normal">Optional</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editLeaderName}
+                      onChange={(e) => setEditLeaderName(e.target.value)}
+                      placeholder="e.g. HG Govinda Das / Ramesh Prabhu"
                       className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-medium focus:outline-none"
                     />
                   </div>

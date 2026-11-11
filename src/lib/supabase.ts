@@ -110,6 +110,7 @@ export function regToDb(p: PassengerRegistration) {
     id: p.id,
     registration_number: p.registrationNumber,
     full_name: p.fullName,
+    leader_name: p.leaderName || null,
     gender: p.gender || null,
     age: p.age ?? null,
     date_of_birth: p.dateOfBirth || null,
@@ -149,10 +150,20 @@ export function regFromDb(r: any): PassengerRegistration {
     }
   }
 
+  // Extract leaderName from r.leader_name or parse from notes as fallback
+  let leaderName: string | undefined = r.leader_name || undefined;
+  if (!leaderName && r.notes) {
+    const match = r.notes.match(/Leader(?:'s)?(?:\s*Name)?:\s*([^|,\n]+)/i);
+    if (match && match[1]) {
+      leaderName = match[1].trim();
+    }
+  }
+
   return {
     id: r.id,
     registrationNumber: r.registration_number,
     fullName: r.full_name,
+    leaderName,
     gender: r.gender || undefined,
     age: r.age !== null ? Number(r.age) : undefined,
     dateOfBirth: r.date_of_birth || undefined,
@@ -286,21 +297,38 @@ export async function upsertRegistrationInDb(reg: PassengerRegistration): Promis
     const payload = regToDb(reg);
     let { error } = await client.from('tour_registrations').upsert(payload, { onConflict: 'id' });
     
-    // If 'seat_type' column does not exist yet on Supabase schema cache (PGRST204), fallback seamlessly
-    if (error && error.code === 'PGRST204' && error.message.includes('seat_type')) {
+    // If 'seat_type' or 'leader_name' column does not exist yet on Supabase schema cache (PGRST204), fallback seamlessly
+    if (error && error.code === 'PGRST204') {
       const fallbackPayload: any = { ...payload };
-      delete fallbackPayload.seat_type;
-
-      // Encode Seat Type in notes so it is not lost
-      if (reg.seatType && reg.seatType !== 'None') {
-        const existingNotes = fallbackPayload.notes || '';
-        if (!existingNotes.includes('Seat Type:')) {
-          fallbackPayload.notes = `Seat Type: ${reg.seatType}${existingNotes ? ' | ' + existingNotes : ''}`;
+      if (error.message.includes('leader_name') || error.message.includes('column')) {
+        delete fallbackPayload.leader_name;
+        if (reg.leaderName) {
+          const existingNotes = fallbackPayload.notes || '';
+          if (!existingNotes.includes("Leader's Name:")) {
+            fallbackPayload.notes = `Leader's Name: ${reg.leaderName}${existingNotes ? ' | ' + existingNotes : ''}`;
+          }
+        }
+      }
+      if (error.message.includes('seat_type') || error.message.includes('column')) {
+        delete fallbackPayload.seat_type;
+        if (reg.seatType && reg.seatType !== 'None') {
+          const existingNotes = fallbackPayload.notes || '';
+          if (!existingNotes.includes('Seat Type:')) {
+            fallbackPayload.notes = `Seat Type: ${reg.seatType}${existingNotes ? ' | ' + existingNotes : ''}`;
+          }
         }
       }
 
       const retryRes = await client.from('tour_registrations').upsert(fallbackPayload, { onConflict: 'id' });
-      error = retryRes.error;
+      if (retryRes.error && retryRes.error.code === 'PGRST204') {
+        // In case multiple missing columns, strip both
+        delete fallbackPayload.leader_name;
+        delete fallbackPayload.seat_type;
+        const retryRes2 = await client.from('tour_registrations').upsert(fallbackPayload, { onConflict: 'id' });
+        error = retryRes2.error;
+      } else {
+        error = retryRes.error;
+      }
     }
 
     if (error) {

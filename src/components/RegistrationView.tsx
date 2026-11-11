@@ -12,7 +12,8 @@ import {
   ArrowRight,
   MapPin,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Crown
 } from 'lucide-react';
 import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 import { DuplicateEntryModal } from './DuplicateEntryModal';
@@ -44,6 +45,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
 }) => {
   // Form State
   const [fullName, setFullName] = useState('');
+  const [leaderName, setLeaderName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [age, setAge] = useState<number | ''>(45);
@@ -85,6 +87,15 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
 
   const selectedTourObj = tours.find(t => t.name === tourName);
 
+  // Derived list of distinct leader names entered so far
+  const existingLeaders = useMemo(() => {
+    const leaderSet = new Set<string>();
+    registrations.forEach(r => {
+      if (r.leaderName?.trim()) leaderSet.add(r.leaderName.trim());
+    });
+    return Array.from(leaderSet);
+  }, [registrations]);
+
   const formatINR = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -125,6 +136,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
 
     // Reset Form
     setFullName('');
+    setLeaderName('');
     setGender('Male');
     setDateOfBirth('');
     setAge(45);
@@ -160,6 +172,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       id: 'reg-' + Date.now(),
       registrationNumber: regId,
       fullName: fullName.trim(),
+      leaderName: leaderName.trim() || undefined,
       gender,
       dateOfBirth: dateOfBirth || undefined,
       age: age ? Number(age) : undefined,
@@ -329,6 +342,29 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                   placeholder="e.g. Gouranga Das Adhikari"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500"
                 />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Leader's Name (দলনেতা / লিডার)</span>
+                  </span>
+                  <span className="text-[10px] text-amber-400 font-normal">Optional</span>
+                </label>
+                <input
+                  type="text"
+                  list="leaders-suggestion-list"
+                  value={leaderName}
+                  onChange={(e) => setLeaderName(e.target.value)}
+                  placeholder="e.g. HG Govinda Das / Ramesh Prabhu"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500"
+                />
+                <datalist id="leaders-suggestion-list">
+                  {existingLeaders.map(l => (
+                    <option key={l} value={l} />
+                  ))}
+                </datalist>
               </div>
 
               <div>
