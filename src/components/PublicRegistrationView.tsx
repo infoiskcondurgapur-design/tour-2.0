@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
+import { ThemeToggle } from '../context/ThemeContext';
 
 interface PublicRegistrationViewProps {
   tours: Tour[];
@@ -283,6 +284,8 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
 
           <div className="flex items-center gap-2">
             <PwaInstallPrompt variant="button" />
+
+            <ThemeToggle />
 
             <button
               onClick={onSwitchToAdmin}

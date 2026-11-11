@@ -6,5 +6,238 @@
   body {
     @apply bg-slate-900 text-slate-100 antialiased;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
+}
+
+/* =========================================================================
+   DAY MODE (LIGHT THEME) STYLES
+   Triggered by class "day-mode" on <html> or <body>
+   ========================================================================= */
+
+html.day-mode {
+  color-scheme: light;
+}
+
+html.day-mode body {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Base page backgrounds */
+html.day-mode .min-h-screen,
+html.day-mode main,
+html.day-mode .bg-slate-950 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Cards, Modals, Popovers, Sidebars, Top Navbar */
+html.day-mode .bg-slate-900,
+html.day-mode .bg-slate-900\/90,
+html.day-mode .bg-slate-900\/80,
+html.day-mode .bg-slate-900\/70,
+html.day-mode .bg-slate-900\/60,
+html.day-mode .bg-slate-900\/50,
+html.day-mode .bg-slate-900\/40,
+html.day-mode .bg-slate-900\/30,
+html.day-mode .bg-slate-950\/60,
+html.day-mode aside {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Sub-panels, code blocks, dark input boxes */
+html.day-mode .bg-slate-950\/80,
+html.day-mode .bg-slate-950\/70,
+html.day-mode .bg-slate-950\/50,
+html.day-mode .bg-slate-950\/40 {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Secondary Buttons & Interactive Chips */
+html.day-mode .bg-slate-800,
+html.day-mode .bg-slate-800\/90,
+html.day-mode .bg-slate-800\/80,
+html.day-mode .bg-slate-800\/70,
+html.day-mode .bg-slate-800\/60 {
+  background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+
+/* Button & table hover states */
+html.day-mode .hover\:bg-slate-800:hover,
+html.day-mode .hover\:bg-slate-700:hover,
+html.day-mode .hover\:bg-slate-800\/80:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.day-mode .hover\:bg-slate-800\/30:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Borders */
+html.day-mode .border-slate-800,
+html.day-mode .border-slate-800\/80,
+html.day-mode .border-slate-800\/60,
+html.day-mode .border-slate-700,
+html.day-mode .border-slate-700\/80,
+html.day-mode .border-slate-700\/60 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Form Inputs, Selects, and Textareas */
+html.day-mode input:not([type="checkbox"]):not([type="radio"]),
+html.day-mode select,
+html.day-mode textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.day-mode input:focus,
+html.day-mode select:focus,
+html.day-mode textarea:focus {
+  border-color: #f97316 !important;
+  box-shadow: 0 0 0 1px #f97316 !important;
+}
+
+html.day-mode select option {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Primary Text Colors */
+html.day-mode .text-white {
+  color: #0f172a !important;
+}
+
+html.day-mode .text-slate-100,
+html.day-mode .text-slate-200,
+html.day-mode .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.day-mode .text-slate-400,
+html.day-mode .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* High-contrast status colors for day mode */
+html.day-mode .text-orange-400 {
+  color: #ea580c !important;
+}
+
+html.day-mode .text-amber-400 {
+  color: #d97706 !important;
+}
+
+html.day-mode .text-emerald-400 {
+  color: #059669 !important;
+}
+
+html.day-mode .text-rose-400 {
+  color: #e11d48 !important;
+}
+
+html.day-mode .text-cyan-400 {
+  color: #0284c7 !important;
+}
+
+html.day-mode .text-purple-400 {
+  color: #7c3aed !important;
+}
+
+/* PRESERVE WHITE TEXT ON COLORED / GRADIENT BUTTONS & PILLS */
+html.day-mode [class*="bg-gradient-to-r from-orange-"],
+html.day-mode [class*="bg-gradient-to-r from-orange-"] *,
+html.day-mode [class*="bg-orange-500"],
+html.day-mode [class*="bg-orange-500"] *,
+html.day-mode [class*="bg-orange-600"],
+html.day-mode [class*="bg-orange-600"] *,
+html.day-mode [class*="bg-emerald-600"],
+html.day-mode [class*="bg-emerald-600"] *,
+html.day-mode [class*="bg-rose-500"],
+html.day-mode [class*="bg-rose-500"] *,
+html.day-mode button.bg-orange-500,
+html.day-mode button.bg-emerald-600,
+html.day-mode a.bg-emerald-600,
+html.day-mode a.bg-emerald-600 * {
+  color: #ffffff !important;
+}
+
+/* Gradients in Day Mode */
+html.day-mode .bg-gradient-to-r.from-slate-900 {
+  background: linear-gradient(to right, #ffffff, #f8fafc, #ffffff) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+html.day-mode .from-orange-950\/60 {
+  background: linear-gradient(to right, #fff7ed, #ffffff, #fef3c7) !important;
+  border-color: #fed7aa !important;
+  box-shadow: 0 4px 6px -1px rgba(249, 115, 22, 0.08) !important;
+}
+
+html.day-mode .from-emerald-950\/80 {
+  background: linear-gradient(to right, #ecfdf5, #ffffff, #ecfdf5) !important;
+  border-color: #a7f3d0 !important;
+  box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.08) !important;
+}
+
+/* Colored Translucent Badges */
+html.day-mode .bg-emerald-500\/10 {
+  background-color: #ecfdf5 !important;
+  border-color: #a7f3d0 !important;
+  color: #047857 !important;
+}
+
+html.day-mode .bg-amber-500\/10 {
+  background-color: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #b45309 !important;
+}
+
+html.day-mode .bg-orange-500\/10,
+html.day-mode .bg-orange-500\/15 {
+  background-color: #fff7ed !important;
+  border-color: #fed7aa !important;
+  color: #c2410c !important;
+}
+
+html.day-mode .bg-purple-500\/10,
+html.day-mode .bg-purple-500\/20 {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+  color: #7e22ce !important;
+}
+
+html.day-mode .bg-rose-500\/10,
+html.day-mode .bg-rose-500\/20 {
+  background-color: #fff1f2 !important;
+  border-color: #fecdd3 !important;
+  color: #be123c !important;
+}
+
+html.day-mode .bg-blue-500\/10,
+html.day-mode .bg-blue-500\/20 {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #1d4ed8 !important;
+}
+
+/* Modal Backdrops */
+html.day-mode .bg-black\/70,
+html.day-mode .bg-black\/80 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+/* Digital Slip (Print & View) */
+html.day-mode #registration-slip {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
 }

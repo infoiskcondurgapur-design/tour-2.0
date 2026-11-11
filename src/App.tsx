@@ -34,6 +34,7 @@ import { ToursView } from './components/ToursView';
 import { SeatAllocationView } from './components/SeatAllocationView';
 import { PublicRegistrationView } from './components/PublicRegistrationView';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
+import { ThemeToggle } from './context/ThemeContext';
 import { 
   supabase, 
   isSupabaseConfigured,
@@ -785,6 +786,9 @@ export function App() {
 
               {/* PWA Install Quick Button */}
               <PwaInstallPrompt variant="button" />
+
+              {/* Day / Night Mode Toggle */}
+              <ThemeToggle />
 
               {/* Add Entry Quick Button */}
               <button

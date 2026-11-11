@@ -24,6 +24,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Anti-flicker Theme Init -->
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('tour_theme_mode_v1');
+          if (saved === 'light') {
+            document.documentElement.classList.add('day-mode');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body class="bg-slate-950 text-slate-100 antialiased font-sans select-none sm:select-auto">
     <div id="root"></div>
