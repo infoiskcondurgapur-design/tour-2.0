@@ -24,7 +24,10 @@ import {
   ExternalLink,
   Copy,
   Check,
-  Globe
+  Globe,
+  MapPin,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import { FinancialTransaction, TransactionType, PassengerRegistration, Tour, TourStatus, RefundStatus } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -264,17 +267,25 @@ export function App() {
     }
   }, [registrations]);
 
-  // Derive unique tour names from tours table, transactions, and registrations
+  // Derive unique tour names from tours table, transactions, and registrations (deduplicated & trimmed)
   const uniqueTours = useMemo(() => {
-    const tourSet = new Set<string>();
-    tours.forEach(t => tourSet.add(t.name));
+    const tourMap = new Map<string, string>();
+    tours.forEach(t => {
+      if (t.name?.trim()) tourMap.set(t.name.trim().toLowerCase(), t.name.trim());
+    });
     transactions.forEach(t => {
-      if (t.tourName) tourSet.add(t.tourName);
+      if (t.tourName?.trim()) {
+        const key = t.tourName.trim().toLowerCase();
+        if (!tourMap.has(key)) tourMap.set(key, t.tourName.trim());
+      }
     });
     registrations.forEach(r => {
-      if (r.tourName) tourSet.add(r.tourName);
+      if (r.tourName?.trim()) {
+        const key = r.tourName.trim().toLowerCase();
+        if (!tourMap.has(key)) tourMap.set(key, r.tourName.trim());
+      }
     });
-    return Array.from(tourSet);
+    return Array.from(tourMap.values());
   }, [tours, transactions, registrations]);
 
   // Modal form state for generic entry
@@ -289,11 +300,65 @@ export function App() {
     notes: '',
   });
 
-  // Filtered transactions by Tour
+  // Filtered transactions by Tour (case-insensitive safe match)
   const tourFilteredTransactions = useMemo(() => {
     if (selectedTour === 'ALL') return transactions;
-    return transactions.filter(t => t.tourName === selectedTour);
+    return transactions.filter(t => (t.tourName || '').trim().toLowerCase() === selectedTour.trim().toLowerCase());
   }, [transactions, selectedTour]);
+
+  // Filtered registrations by Tour (case-insensitive safe match)
+  const tourFilteredRegistrations = useMemo(() => {
+    if (selectedTour === 'ALL') return registrations;
+    return registrations.filter(r => (r.tourName || '').trim().toLowerCase() === selectedTour.trim().toLowerCase());
+  }, [registrations, selectedTour]);
+
+  // Selected tour object (if specific tour is chosen)
+  const selectedTourObj = useMemo(() => {
+    if (selectedTour === 'ALL') return null;
+    return tours.find(t => (t.name || '').trim().toLowerCase() === selectedTour.trim().toLowerCase()) || null;
+  }, [tours, selectedTour]);
+
+  // Filtered seated count
+  const tourFilteredSeatedCount = useMemo(() => {
+    return tourFilteredRegistrations.filter(r => !!r.seatNumber).length;
+  }, [tourFilteredRegistrations]);
+
+  // Per-Tour Comprehensive Financial & Devotee Stats for instant breakdown & comparison
+  const tourStatsList = useMemo(() => {
+    return uniqueTours.map(tourName => {
+      const tourObj = tours.find(t => (t.name || '').trim().toLowerCase() === tourName.trim().toLowerCase());
+      const tourTxs = transactions.filter(t => (t.tourName || '').trim().toLowerCase() === tourName.trim().toLowerCase());
+      const tourRegs = registrations.filter(r => (r.tourName || '').trim().toLowerCase() === tourName.trim().toLowerCase());
+
+      let earning = 0;
+      let expense = 0;
+      let refund = 0;
+      let due = 0;
+
+      tourTxs.forEach(t => {
+        const amt = Number(t.amount || 0);
+        if (t.type === 'earning') earning += amt;
+        else if (t.type === 'expense') expense += amt;
+        else if (t.type === 'refund') refund += amt;
+        else if (t.type === 'due') due += amt;
+      });
+
+      const net = earning - expense - refund;
+      const allocatedSeats = tourRegs.filter(r => !!r.seatNumber).length;
+
+      return {
+        tourName,
+        tourObj,
+        earning,
+        expense,
+        refund,
+        due,
+        net,
+        pilgrimsCount: tourRegs.length,
+        allocatedSeats,
+      };
+    });
+  }, [uniqueTours, tours, transactions, registrations]);
 
   // The 4 Core Requested Metrics + Net Balance (Calculated strictly from real entries)
   const { totalEarning, totalExpenses, totalRefund, totalDue, netBalance } = useMemo(() => {
@@ -819,6 +884,7 @@ export function App() {
               onProcessRefund={handleProcessPassengerRefund}
               onNavigateToRegistration={() => setCurrentView('registration')}
               tours={tours}
+              initialTourFilter={selectedTour !== 'ALL' ? selectedTour : 'ALL'}
             />
           ) : currentView === 'tours' ? (
             <ToursView
@@ -838,19 +904,208 @@ export function App() {
               onClearAllSeatsForTour={handleClearAllSeatsForTour}
               onUpdateRegistration={handleUpdateRegistration}
               onDeleteRegistration={handleDeleteRegistration}
+              initialTour={selectedTour !== 'ALL' ? selectedTour : undefined}
             />
           ) : (
             <>
               {/* PWA Install Promo Banner */}
               <PwaInstallPrompt variant="banner" />
 
+              {/* ======================================================== */}
+              {/* PROMINENT TOUR SELECTOR BAR (Primary Filter on Dashboard) */}
+              {/* Allows immediate 1-click tour switching                  */}
+              {/* ======================================================== */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                      <Compass className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        <span>Active Tour Filter</span>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                          {uniqueTours.length} {uniqueTours.length === 1 ? 'Tour' : 'Tours'}
+                        </span>
+                      </h2>
+                      <p className="text-xs text-slate-400">
+                        Filter all dashboard metrics, balances, and transactions by tour or view consolidated total.
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedTour !== 'ALL' && (
+                    <button
+                      onClick={() => setSelectedTour('ALL')}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors self-start sm:self-auto cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
+                      <span>Show All Tours</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Tour Tab Pills */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 scrollbar-thin">
+                  {/* Option 1: ALL TOURS */}
+                  <button
+                    onClick={() => setSelectedTour('ALL')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
+                      selectedTour === 'ALL'
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-400 shadow-md shadow-orange-500/25'
+                        : 'bg-slate-950/80 hover:bg-slate-800/80 text-slate-300 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>All Tours (Consolidated)</span>
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                      selectedTour === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+                    }`}>
+                      {registrations.length} pilgrims
+                    </span>
+                  </button>
+
+                  {/* Option 2+: Individual Tour Tabs */}
+                  {tourStatsList.map((st) => {
+                    const isSelected = selectedTour.trim().toLowerCase() === st.tourName.trim().toLowerCase();
+                    const code = st.tourObj?.code;
+                    return (
+                      <button
+                        key={st.tourName}
+                        onClick={() => setSelectedTour(st.tourName)}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer border ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-400 shadow-md shadow-orange-500/25'
+                            : 'bg-slate-950/80 hover:bg-slate-800/80 text-slate-300 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        <Compass className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-orange-400'}`} />
+                        <span>{st.tourName}</span>
+                        {code && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono uppercase ${
+                            isSelected ? 'bg-black/20 text-white' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'
+                          }`}>
+                            {code}
+                          </span>
+                        )}
+                        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {st.pilgrimsCount} pilgrims
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ======================================================== */}
+              {/* ACTIVE TOUR CONTEXT BANNER                               */}
+              {/* Highlights exactly which tour's numbers are shown        */}
+              {/* ======================================================== */}
+              {selectedTour !== 'ALL' ? (
+                <div className="bg-gradient-to-r from-orange-500/15 via-amber-500/10 to-slate-900 border border-orange-500/40 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                        <span className="px-2.5 py-0.5 rounded-full bg-orange-500 text-white text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+                          <Compass className="w-3.5 h-3.5" />
+                          Viewing Specific Tour
+                        </span>
+                        {selectedTourObj?.code && (
+                          <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-200 text-xs font-mono font-bold border border-slate-700">
+                            {selectedTourObj.code}
+                          </span>
+                        )}
+                        {selectedTourObj?.status && (
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 text-xs font-semibold capitalize border border-emerald-500/30">
+                            {selectedTourObj.status.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+
+                      <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                        {selectedTour}
+                      </h1>
+
+                      <div className="flex items-center gap-4 flex-wrap text-xs text-slate-400 mt-2.5">
+                        {selectedTourObj?.destination && (
+                          <span className="inline-flex items-center gap-1 text-slate-300">
+                            <MapPin className="w-3.5 h-3.5 text-orange-400" />
+                            <span>{selectedTourObj.destination}</span>
+                          </span>
+                        )}
+                        {selectedTourObj?.startDate && (
+                          <span className="inline-flex items-center gap-1 text-slate-300">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{selectedTourObj.startDate} to {selectedTourObj.endDate || 'TBD'}</span>
+                          </span>
+                        )}
+                        <span className="inline-flex items-center gap-1 text-slate-300">
+                          <Users className="w-3.5 h-3.5 text-purple-400" />
+                          <span><strong className="text-white font-mono">{tourFilteredRegistrations.length}</strong> pilgrims ({tourFilteredSeatedCount} seated)</span>
+                        </span>
+                        {selectedTourObj?.defaultFee ? (
+                          <span className="inline-flex items-center gap-1 text-slate-300">
+                            <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Tour Fee: <strong className="text-white font-mono">{formatINR(selectedTourObj.defaultFee)}</strong></span>
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => setSelectedTour('ALL')}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
+                        <span>Show All Tours</span>
+                      </button>
+                      <button
+                        onClick={() => setCurrentView('roster')}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 rounded-xl text-xs font-bold border border-purple-500/40 transition-all cursor-pointer"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Roster ({tourFilteredRegistrations.length})</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 shrink-0">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                        <span>Consolidated Portfolio Overview — Across All {uniqueTours.length} Tours</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Financial metrics below represent combined totals across {uniqueTours.length} active tours and {registrations.length} registered devotees. Select a tour above to isolate individual details.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Net In-Hand Banner */}
               <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-800/80 border border-slate-800 rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
-                    <Wallet className="w-4 h-4" />
-                    Net Cash Balance (In Hand)
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+                      <Wallet className="w-4 h-4" />
+                      Net Cash Balance (In Hand)
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                      selectedTour === 'ALL'
+                        ? 'bg-slate-800 text-slate-300 border-slate-700'
+                        : 'bg-orange-500/20 text-orange-300 border-orange-500/40'
+                    }`}>
+                      {selectedTour === 'ALL' ? '🌐 All Tours (Consolidated)' : `🚩 ${selectedTour}`}
+                    </span>
+                  </div>
                   <div className="text-3xl font-extrabold font-mono text-white mt-1">
                     {formatINR(netBalance)}
                   </div>
@@ -869,7 +1124,7 @@ export function App() {
               </div>
 
               {/* ======================================================== */}
-              {/* THE 4 PRIMARY METRIC CARDS (Requested by User)           */}
+              {/* THE 4 PRIMARY METRIC CARDS                               */}
               {/* Total Earning | Total Expenses | Refund | Due            */}
               {/* ======================================================== */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -888,9 +1143,14 @@ export function App() {
                   <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
                     {formatINR(totalEarning)}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-3 text-xs text-emerald-400 font-medium">
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                    <span>Payments collected</span>
+                  <div className="flex items-center justify-between gap-1.5 mt-3 text-xs text-emerald-400 font-medium">
+                    <div className="flex items-center gap-1">
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <span>Payments collected</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 font-mono truncate max-w-[120px]">
+                      {selectedTour === 'ALL' ? 'All Tours' : selectedTour}
+                    </span>
                   </div>
                 </div>
 
@@ -908,9 +1168,14 @@ export function App() {
                   <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
                     {formatINR(totalExpenses)}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-3 text-xs text-amber-400 font-medium">
-                    <ArrowDownRight className="w-3.5 h-3.5" />
-                    <span>Operational costs & bills</span>
+                  <div className="flex items-center justify-between gap-1.5 mt-3 text-xs text-amber-400 font-medium">
+                    <div className="flex items-center gap-1">
+                      <ArrowDownRight className="w-3.5 h-3.5" />
+                      <span>Operational costs</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 font-mono truncate max-w-[120px]">
+                      {selectedTour === 'ALL' ? 'All Tours' : selectedTour}
+                    </span>
                   </div>
                 </div>
 
@@ -928,9 +1193,14 @@ export function App() {
                   <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
                     {formatINR(totalRefund)}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-3 text-xs text-purple-400 font-medium">
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Returned to passengers</span>
+                  <div className="flex items-center justify-between gap-1.5 mt-3 text-xs text-purple-400 font-medium">
+                    <div className="flex items-center gap-1">
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Returned to passengers</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 font-mono truncate max-w-[120px]">
+                      {selectedTour === 'ALL' ? 'All Tours' : selectedTour}
+                    </span>
                   </div>
                 </div>
 
@@ -948,9 +1218,14 @@ export function App() {
                   <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
                     {formatINR(totalDue)}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-3 text-xs text-rose-400 font-medium">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>Pending receivables</span>
+                  <div className="flex items-center justify-between gap-1.5 mt-3 text-xs text-rose-400 font-medium">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Pending receivables</span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-300 font-mono truncate max-w-[120px]">
+                      {selectedTour === 'ALL' ? 'All Tours' : selectedTour}
+                    </span>
                   </div>
                 </div>
 
@@ -971,7 +1246,7 @@ export function App() {
                         : '0%'}
                     </div>
                     <p className="text-xs text-slate-400 mt-1">
-                      {formatINR(totalEarning)} collected out of {formatINR(totalEarning + totalDue)} expected
+                      {formatINR(totalEarning)} collected out of {formatINR(totalEarning + totalDue)} expected ({selectedTour === 'ALL' ? 'All Tours' : selectedTour})
                     </p>
                   </div>
                   <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mt-4">
@@ -1002,7 +1277,9 @@ export function App() {
                   </div>
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 mt-2">
                     <span>Active Pilgrims:</span>
-                    <strong className="text-white font-mono">{registrations.length} registered</strong>
+                    <strong className="text-white font-mono">
+                      {tourFilteredRegistrations.length} registered {selectedTour !== 'ALL' ? `for ${selectedTour}` : '(all tours)'}
+                    </strong>
                   </div>
                 </div>
 
@@ -1024,10 +1301,129 @@ export function App() {
                   </div>
                   <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 mt-2">
                     <span>Pilgrimage Tours:</span>
-                    <strong className="text-white font-mono">{tours.length} active</strong>
+                    <strong className="text-white font-mono truncate max-w-[180px]">
+                      {selectedTour === 'ALL' ? `${uniqueTours.length} active tours` : selectedTour}
+                    </strong>
                   </div>
                 </div>
               </div>
+
+              {/* ======================================================== */}
+              {/* TOUR-BY-TOUR FINANCIAL BREAKDOWN & COMPARISON             */}
+              {/* Distinct card per tour showing collections, costs & dues  */}
+              {/* ======================================================== */}
+              {uniqueTours.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Compass className="w-4 h-4 text-orange-400" />
+                      <h3 className="font-bold text-white text-sm sm:text-base">
+                        {selectedTour === 'ALL'
+                          ? `Tour Performance Overview (${tourStatsList.length} Tours)`
+                          : `Tours Comparison`}
+                      </h3>
+                    </div>
+                    <span className="text-xs text-slate-400 hidden sm:inline">
+                      Click any tour to isolate its metrics on the dashboard
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tourStatsList.map((st) => {
+                      const isSelected = selectedTour.trim().toLowerCase() === st.tourName.trim().toLowerCase();
+                      return (
+                        <div
+                          key={st.tourName}
+                          className={`rounded-2xl p-5 border transition-all relative flex flex-col justify-between shadow-lg ${
+                            isSelected
+                              ? 'bg-slate-900 border-orange-500/80 shadow-orange-500/10 ring-1 ring-orange-500/40'
+                              : 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <h4 className="font-extrabold text-white text-base leading-tight">
+                                    {st.tourName}
+                                  </h4>
+                                  {st.tourObj?.code && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-orange-500/15 text-orange-400 border border-orange-500/30 uppercase">
+                                      {st.tourObj.code}
+                                    </span>
+                                  )}
+                                </div>
+                                {st.tourObj?.destination && (
+                                  <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                                    <MapPin className="w-3 h-3 text-orange-400 shrink-0" />
+                                    <span className="truncate">{st.tourObj.destination}</span>
+                                  </p>
+                                )}
+                              </div>
+
+                              {isSelected ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500 text-white shadow-xs shrink-0">
+                                  Active Filter
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => setSelectedTour(st.tourName)}
+                                  className="px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-800 hover:bg-orange-500 hover:text-white text-slate-300 transition-colors border border-slate-700 cursor-pointer shrink-0"
+                                >
+                                  Focus
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Quick Metrics Grid for this tour */}
+                            <div className="grid grid-cols-2 gap-2 mt-4 text-xs">
+                              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                                <span className="text-[10px] text-emerald-400 font-semibold uppercase block">Collections</span>
+                                <span className="font-extrabold font-mono text-white text-sm">
+                                  {formatINR(st.earning)}
+                                </span>
+                              </div>
+                              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                                <span className="text-[10px] text-amber-400 font-semibold uppercase block">Expenses</span>
+                                <span className="font-extrabold font-mono text-white text-sm">
+                                  {formatINR(st.expense)}
+                                </span>
+                              </div>
+                              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                                <span className="text-[10px] text-cyan-400 font-semibold uppercase block">In-Hand Cash</span>
+                                <span className="font-extrabold font-mono text-cyan-400 text-sm">
+                                  {formatINR(st.net)}
+                                </span>
+                              </div>
+                              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+                                <span className="text-[10px] text-rose-400 font-semibold uppercase block">Pending Due</span>
+                                <span className="font-extrabold font-mono text-rose-400 text-sm">
+                                  {formatINR(st.due)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5 text-purple-400" />
+                              <span>{st.pilgrimsCount} pilgrims ({st.allocatedSeats} seated)</span>
+                            </span>
+
+                            <button
+                              onClick={() => setSelectedTour(st.tourName)}
+                              className="font-bold text-orange-400 hover:text-orange-300 inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <span>{isSelected ? 'Viewing' : 'Select Tour'}</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Quick Navigation Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1060,10 +1456,10 @@ export function App() {
                     Passengers Roster
                   </h3>
                   <p className="text-xs text-slate-400 mt-1 mb-3">
-                    View {registrations.length} pilgrims, refund status, and dues.
+                    View {tourFilteredRegistrations.length} pilgrims, refund status, and dues {selectedTour !== 'ALL' ? `for ${selectedTour}` : ''}.
                   </p>
                   <span className="text-xs font-bold text-purple-400 inline-flex items-center gap-1">
-                    Open Roster ({registrations.length}) →
+                    Open Roster ({tourFilteredRegistrations.length}) →
                   </span>
                 </div>
 
@@ -1099,9 +1495,129 @@ export function App() {
                     Visual bus layout, seat assignment & manifest.
                   </p>
                   <span className="text-xs font-bold text-cyan-400 inline-flex items-center gap-1">
-                    Manage Seats ({allocatedSeatsCount} seated) →
+                    Manage Seats ({tourFilteredSeatedCount} seated) →
                   </span>
                 </div>
+              </div>
+
+              {/* ======================================================== */}
+              {/* RECENT FINANCIAL ACTIVITY FEED (Labeled with Tour Badges) */}
+              {/* ======================================================== */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-base flex items-center gap-2">
+                        <span>Recent Financial Activity</span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                          {tourFilteredTransactions.length} records
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        {selectedTour === 'ALL'
+                          ? 'Recent payments and expenses across all tours (each row displays its tour badge)'
+                          : `Showing transactions specifically for ${selectedTour}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Entry</span>
+                    </button>
+                  </div>
+                </div>
+
+                {tourFilteredTransactions.length === 0 ? (
+                  <div className="text-center py-8 text-slate-400 text-xs">
+                    <Clock className="w-8 h-8 mx-auto mb-2 text-slate-500 opacity-50" />
+                    <p className="font-semibold text-slate-300">No transactions recorded yet {selectedTour !== 'ALL' ? `for ${selectedTour}` : ''}</p>
+                    <p className="text-slate-500 mt-1">Passenger registration payments and operational expenses will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-800/80 max-h-96 overflow-y-auto scrollbar-thin">
+                    {tourFilteredTransactions.slice(0, 15).map((tx) => {
+                      const isEarning = tx.type === 'earning';
+                      const isExpense = tx.type === 'expense';
+                      const isRefund = tx.type === 'refund';
+                      const isDue = tx.type === 'due';
+
+                      return (
+                        <div key={tx.id} className="py-3 flex items-center justify-between gap-3 text-xs hover:bg-slate-800/30 px-2 rounded-xl transition-colors">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`p-2 rounded-xl shrink-0 ${
+                              isEarning ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                              isExpense ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                              isRefund ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                              'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            }`}>
+                              {isEarning && <ArrowUpRight className="w-4 h-4" />}
+                              {isExpense && <ArrowDownRight className="w-4 h-4" />}
+                              {isRefund && <RotateCcw className="w-4 h-4" />}
+                              {isDue && <AlertCircle className="w-4 h-4" />}
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white truncate max-w-xs">{tx.partyName}</span>
+                                
+                                {/* PROMINENT TOUR BADGE */}
+                                <button
+                                  onClick={() => setSelectedTour(tx.tourName)}
+                                  title={`Click to filter dashboard to ${tx.tourName}`}
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                    selectedTour.trim().toLowerCase() === (tx.tourName || '').trim().toLowerCase()
+                                      ? 'bg-orange-500 text-white border-orange-400'
+                                      : 'bg-orange-500/10 text-orange-400 border-orange-500/30 hover:bg-orange-500/20'
+                                  }`}
+                                >
+                                  <Compass className="w-3 h-3" />
+                                  <span>{tx.tourName}</span>
+                                </button>
+
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
+                                  {tx.category}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                                <span>{tx.date}</span>
+                                <span>•</span>
+                                <span>{tx.paymentMethod}</span>
+                                {tx.notes && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="truncate max-w-xs italic text-slate-500">{tx.notes}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <div className={`font-mono font-extrabold text-sm ${
+                              isEarning ? 'text-emerald-400' :
+                              isExpense ? 'text-amber-400' :
+                              isRefund ? 'text-purple-400' :
+                              'text-rose-400'
+                            }`}>
+                              {isEarning ? '+' : isExpense ? '-' : ''}{formatINR(tx.amount)}
+                            </div>
+                            <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                              {tx.type}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </>
           )}

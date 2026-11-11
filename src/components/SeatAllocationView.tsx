@@ -36,6 +36,7 @@ interface SeatAllocationViewProps {
   onClearAllSeatsForTour: (tourName: string) => void;
   onUpdateRegistration?: (registration: PassengerRegistration) => void;
   onDeleteRegistration?: (id: string) => void;
+  initialTour?: string;
 }
 
 const VEHICLES_STORAGE_KEY = 'real_finance_vehicles_v1';
@@ -48,11 +49,19 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
   onClearAllSeatsForTour,
   onUpdateRegistration,
   onDeleteRegistration,
+  initialTour,
 }) => {
   // Active Tour Selection
   const [selectedTourName, setSelectedTourName] = useState<string>(() => {
+    if (initialTour && initialTour !== 'ALL') return initialTour;
     return tours[0]?.name || (registrations[0]?.tourName || '');
   });
+
+  React.useEffect(() => {
+    if (initialTour && initialTour !== 'ALL') {
+      setSelectedTourName(initialTour);
+    }
+  }, [initialTour]);
 
   // View Mode: 'table' (Sl. No, Full Name, Gender, Age, Seat Number) vs 'coach_map' (Visual Layout)
   const [viewMode, setViewMode] = useState<'table' | 'coach_map'>('table');

@@ -36,6 +36,7 @@ interface PassengersRosterViewProps {
   ) => void;
   onNavigateToRegistration: () => void;
   tours: Tour[];
+  initialTourFilter?: string;
 }
 
 export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
@@ -45,10 +46,17 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   onProcessRefund,
   onNavigateToRegistration,
   tours,
+  initialTourFilter,
 }) => {
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [tourFilter, setTourFilter] = useState('ALL');
+  const [tourFilter, setTourFilter] = useState(initialTourFilter || 'ALL');
+
+  React.useEffect(() => {
+    if (initialTourFilter) {
+      setTourFilter(initialTourFilter);
+    }
+  }, [initialTourFilter]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [refundStatusFilter, setRefundStatusFilter] = useState('ALL');
 
