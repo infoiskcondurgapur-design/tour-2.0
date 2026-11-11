@@ -9,7 +9,6 @@ import {
   Armchair,
   Globe
 } from 'lucide-react';
-import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { ThemeToggle } from '../context/ThemeContext';
 
 interface SidebarProps {
@@ -152,8 +151,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {/* Theme Toggle & PWA in Sidebar */}
-      <div className="px-3 pb-1 space-y-1.5">
+      {/* Theme Toggle in Sidebar */}
+      <div className="px-3 pb-1">
         {!collapsed ? (
           <ThemeToggle variant="sidebar" />
         ) : (
@@ -161,7 +160,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <ThemeToggle variant="icon" />
           </div>
         )}
-        {!collapsed && <PwaInstallPrompt variant="sidebar" />}
       </div>
 
       {/* Mini Quick Stats Widget at bottom */}
