@@ -148,6 +148,22 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
       return;
     }
 
+    // Check for duplicate entry with another passenger
+    const cleanName = editFullName.trim().toLowerCase().replace(/\s+/g, ' ');
+    const cleanPhone = editPhoneNumber.replace(/\D/g, '');
+    const duplicate = registrations.find(r => {
+      if (r.id === editingTarget.id) return false;
+      const rName = (r.fullName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const rPhone = (r.phoneNumber || '').replace(/\D/g, '');
+      return rName === cleanName && rPhone === cleanPhone && cleanName && cleanPhone;
+    });
+
+    if (duplicate) {
+      if (!confirm(`This is Duplicate Entry.\n\nAnother devotee with Name "${duplicate.fullName}" and Mobile "${duplicate.phoneNumber}" is already registered (#${duplicate.registrationNumber} in ${duplicate.tourName}).\n\nDo you want to save this change anyway?`)) {
+        return;
+      }
+    }
+
     const feeNum = Number(editAgreedFee || 0);
     const paidNum = Number(editPaidAmount || 0);
     const refundAmt = Number(editingTarget.refundAmount || 0);

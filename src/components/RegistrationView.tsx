@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   UserPlus, 
   CheckCircle2, 
@@ -11,9 +11,11 @@ import {
   Users,
   ArrowRight,
   MapPin,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
+import { DuplicateEntryModal } from './DuplicateEntryModal';
 
 interface RegistrationViewProps {
   registrations: PassengerRegistration[];
@@ -21,6 +23,18 @@ interface RegistrationViewProps {
   onNavigateToRoster: () => void;
   tours: Tour[];
 }
+
+const normalizePhone = (p: string) => {
+  if (!p) return '';
+  const digits = p.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+  if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+  return digits;
+};
+
+const normalizeName = (n: string) => {
+  return (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+};
 
 export const RegistrationView: React.FC<RegistrationViewProps> = ({
   registrations,
@@ -45,6 +59,24 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [regDate, setRegDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+
+  // Duplicate Entry Verification State
+  const [duplicateMatch, setDuplicateMatch] = useState<PassengerRegistration | null>(null);
+  const [pendingRegData, setPendingRegData] = useState<PassengerRegistration | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+
+  // Live real-time check: detects if entered Name & Mobile match a prior record
+  const liveDuplicate = useMemo(() => {
+    const cleanName = normalizeName(fullName);
+    const cleanPhone = normalizePhone(phoneNumber);
+    if (!cleanName || !cleanPhone || cleanPhone.length < 5) return null;
+
+    return registrations.find(r => {
+      const matchName = normalizeName(r.fullName) === cleanName;
+      const matchPhone = normalizePhone(r.phoneNumber) === cleanPhone;
+      return matchName && matchPhone;
+    }) || null;
+  }, [fullName, phoneNumber, registrations]);
 
   // Auto-calculated Due amount in form
   const feeNum = Number(agreedFee || 0);
@@ -88,6 +120,29 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
     }
   };
 
+  const commitRegistration = (reg: PassengerRegistration) => {
+    onAddRegistration(reg);
+
+    // Reset Form
+    setFullName('');
+    setGender('Male');
+    setDateOfBirth('');
+    setAge(45);
+    setPhoneNumber('');
+    setWhatsappNumber('');
+    setAddress('');
+    setPaidAmount(0);
+    setNotes('');
+    setSeatNumber('');
+    setSeatType('Sleeper Class (SL)');
+    setDuplicateMatch(null);
+    setPendingRegData(null);
+    setShowDuplicateModal(false);
+
+    setSuccessNotice(`Registration #${reg.registrationNumber} created successfully! Earning and Due accounts updated.`);
+    setTimeout(() => setSuccessNotice(null), 5000);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !phoneNumber || !tourName || feeNum <= 0) {
@@ -125,23 +180,21 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       status,
     };
 
-    onAddRegistration(newReg);
+    // Check if Name & Mobile match an existing prior entry
+    const existingDuplicate = liveDuplicate || registrations.find(r => {
+      const matchName = normalizeName(r.fullName) === normalizeName(fullName);
+      const matchPhone = normalizePhone(r.phoneNumber) === normalizePhone(phoneNumber);
+      return matchName && matchPhone;
+    });
 
-    // Reset Form
-    setFullName('');
-    setGender('Male');
-    setDateOfBirth('');
-    setAge(45);
-    setPhoneNumber('');
-    setWhatsappNumber('');
-    setAddress('');
-    setPaidAmount(0);
-    setNotes('');
-    setSeatNumber('');
-    setSeatType('Sleeper Class (SL)');
+    if (existingDuplicate) {
+      setDuplicateMatch(existingDuplicate);
+      setPendingRegData(newReg);
+      setShowDuplicateModal(true);
+      return;
+    }
 
-    setSuccessNotice(`Registration #${regId} created successfully! Earning and Due accounts updated.`);
-    setTimeout(() => setSuccessNotice(null), 5000);
+    commitRegistration(newReg);
   };
 
   return (
@@ -406,6 +459,27 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                 />
               </div>
             </div>
+
+            {/* Live Duplicate Warning */}
+            {liveDuplicate && (
+              <div className="mt-4 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3 text-xs text-rose-200 animate-in fade-in">
+                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-rose-400 text-sm flex items-center gap-1.5">
+                    <span>Duplicate Entry Alert</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono">
+                      #{liveDuplicate.registrationNumber}
+                    </span>
+                  </div>
+                  <p className="text-slate-300">
+                    A devotee with Name <strong className="text-white">"{liveDuplicate.fullName}"</strong> and Mobile <strong className="text-white font-mono">{liveDuplicate.phoneNumber}</strong> was already registered on <strong className="text-white font-mono">{liveDuplicate.registrationDate}</strong> for <strong className="text-amber-300">{liveDuplicate.tourName}</strong>.
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Submitting this form will display the duplicate entry verification popup to prevent accidental double-registration.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section 3: Financial Agreement & Advance Payment */}
@@ -513,6 +587,24 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
           Registered Passengers Roster
         </button>.
       </div>
+
+      {/* Duplicate Entry Verification Popup Modal */}
+      <DuplicateEntryModal
+        isOpen={showDuplicateModal}
+        onClose={() => {
+          setShowDuplicateModal(false);
+          setPendingRegData(null);
+        }}
+        duplicate={duplicateMatch}
+        onProceedAnyway={pendingRegData ? () => commitRegistration(pendingRegData) : undefined}
+        onViewExisting={() => {
+          setShowDuplicateModal(false);
+          setPendingRegData(null);
+          onNavigateToRoster();
+        }}
+        viewExistingLabel="View in Roster"
+        isDevoteePortal={false}
+      />
     </div>
   );
 };

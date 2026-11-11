@@ -18,15 +18,18 @@ import {
   ShieldCheck,
   UserCheck,
   ChevronRight,
-  Info
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { ThemeToggle } from '../context/ThemeContext';
+import { DuplicateEntryModal } from './DuplicateEntryModal';
 
 interface PublicRegistrationViewProps {
   tours: Tour[];
   registrationsCount: number;
+  registrations?: PassengerRegistration[];
   onAddRegistration: (reg: PassengerRegistration) => void;
   onSwitchToAdmin: () => void;
 }
@@ -34,6 +37,7 @@ interface PublicRegistrationViewProps {
 export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   tours,
   registrationsCount,
+  registrations = [],
   onAddRegistration,
   onSwitchToAdmin,
 }) => {
@@ -103,6 +107,37 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedRegistration, setCompletedRegistration] = useState<PassengerRegistration | null>(null);
 
+  // Duplicate Verification Modal State
+  const [duplicateMatch, setDuplicateMatch] = useState<PassengerRegistration | null>(null);
+  const [pendingRegData, setPendingRegData] = useState<PassengerRegistration | null>(null);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+
+  const normalizePhone = (p: string) => {
+    if (!p) return '';
+    const digits = p.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
+    if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
+    return digits;
+  };
+
+  const normalizeName = (n: string) => {
+    return (n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  };
+
+  // Live real-time duplicate detection
+  const liveDuplicate = useMemo(() => {
+    if (!registrations || registrations.length === 0) return null;
+    const cleanName = normalizeName(fullName);
+    const cleanPhone = normalizePhone(phoneNumber);
+    if (!cleanName || !cleanPhone || cleanPhone.length < 5) return null;
+
+    return registrations.find(r => {
+      const matchName = normalizeName(r.fullName) === cleanName;
+      const matchPhone = normalizePhone(r.phoneNumber) === cleanPhone;
+      return matchName && matchPhone;
+    }) || null;
+  }, [fullName, phoneNumber, registrations]);
+
   // Active tour object
   const currentTourObj = useMemo(() => {
     return tours.find(t => t.name === selectedTourName) || defaultTour;
@@ -152,6 +187,21 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   }, [paymentChoice, totalTourFee, tokenAmount]);
 
   const calculatedDueAmount = Math.max(0, totalTourFee - calculatedPaidAmount);
+
+  const commitRegistration = (regData: PassengerRegistration) => {
+    try {
+      onAddRegistration(regData);
+      setCompletedRegistration(regData);
+      setShowDuplicateModal(false);
+      setDuplicateMatch(null);
+      setPendingRegData(null);
+    } catch (err) {
+      console.error('Registration failed:', err);
+      alert('Could not complete registration. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Handle Form Submission
   const handleSubmit = (e: React.FormEvent) => {
@@ -219,15 +269,22 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
       status,
     };
 
-    try {
-      onAddRegistration(regData);
-      setCompletedRegistration(regData);
-    } catch (err) {
-      console.error('Registration failed:', err);
-      alert('Could not complete registration. Please try again.');
-    } finally {
+    // Check for duplicate entry (matching Name & Mobile Number)
+    const existingDuplicate = liveDuplicate || (registrations || []).find(r => {
+      const matchName = normalizeName(r.fullName) === normalizeName(fullName);
+      const matchPhone = normalizePhone(r.phoneNumber) === normalizePhone(phoneNumber);
+      return matchName && matchPhone;
+    });
+
+    if (existingDuplicate) {
       setIsSubmitting(false);
+      setDuplicateMatch(existingDuplicate);
+      setPendingRegData(regData);
+      setShowDuplicateModal(true);
+      return;
     }
+
+    commitRegistration(regData);
   };
 
   // WhatsApp share link for completed registration
@@ -758,6 +815,27 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                       />
                     </div>
                   </div>
+
+                  {/* Live Duplicate Warning */}
+                  {liveDuplicate && (
+                    <div className="mt-4 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-3 text-xs text-rose-200 animate-in fade-in">
+                      <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <div className="font-bold text-rose-400 text-sm flex items-center gap-1.5">
+                          <span>Already Registered</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-mono">
+                            #{liveDuplicate.registrationNumber}
+                          </span>
+                        </div>
+                        <p className="text-slate-300">
+                          A registration with Name <strong className="text-white">"{liveDuplicate.fullName}"</strong> and Mobile <strong className="text-white font-mono">{liveDuplicate.phoneNumber}</strong> was already completed on <strong className="text-white font-mono">{liveDuplicate.registrationDate}</strong> for <strong className="text-amber-300">{liveDuplicate.tourName}</strong>.
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Submitting will display the duplicate entry verification popup so you can access your existing registration pass.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* 3. SAFETY & SPECIAL REQUESTS */}
@@ -1027,6 +1105,25 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
           </div>
         )}
       </main>
+
+      {/* Duplicate Entry Verification Popup Modal */}
+      <DuplicateEntryModal
+        isOpen={showDuplicateModal}
+        onClose={() => {
+          setShowDuplicateModal(false);
+          setPendingRegData(null);
+        }}
+        duplicate={duplicateMatch}
+        onProceedAnyway={pendingRegData ? () => commitRegistration(pendingRegData) : undefined}
+        onViewExisting={() => {
+          if (duplicateMatch) {
+            setCompletedRegistration(duplicateMatch);
+            setShowDuplicateModal(false);
+          }
+        }}
+        viewExistingLabel="View My Registration Pass"
+        isDevoteePortal={true}
+      />
 
       {/* Footer */}
       <footer className="bg-slate-900/60 border-t border-slate-800/80 py-4 px-4 text-center text-xs text-slate-500 print:hidden">

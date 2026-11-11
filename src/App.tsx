@@ -679,6 +679,7 @@ export function App() {
       <PublicRegistrationView
         tours={tours}
         registrationsCount={registrations.length}
+        registrations={registrations}
         onAddRegistration={handleAddRegistration}
         onSwitchToAdmin={() => {
           window.location.hash = '';
