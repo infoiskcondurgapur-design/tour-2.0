@@ -749,6 +749,11 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
                               <span className="font-mono text-[10px] text-orange-400 font-bold">
                                 {pilgrim.registrationNumber}
                               </span>
+                              {pilgrim.seatType && pilgrim.seatType !== 'None' && (
+                                <span className="text-[9px] bg-orange-500/10 text-orange-400 border border-orange-500/20 px-1 py-0.2 rounded font-semibold">
+                                  {pilgrim.seatType}
+                                </span>
+                              )}
                               {pilgrim.notes && (
                                 <span className="text-[9px] bg-amber-500/20 text-amber-300 px-1 rounded truncate max-w-[130px]" title={pilgrim.notes}>
                                   ★ {pilgrim.notes}

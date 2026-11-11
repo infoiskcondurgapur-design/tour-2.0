@@ -20,7 +20,7 @@ import {
   ChevronRight,
   Info
 } from 'lucide-react';
-import { PassengerRegistration, Tour } from '../types';
+import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 
 interface PublicRegistrationViewProps {
@@ -78,6 +78,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [age, setAge] = useState<number | ''>('');
+  const [seatType, setSeatType] = useState<SeatType>('Sleeper Class (SL)');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [sameAsCalling, setSameAsCalling] = useState(true);
@@ -203,6 +204,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
       age: age ? Number(age) : undefined,
       phoneNumber: phoneNumber.trim(),
       whatsappNumber: finalWhatsApp,
+      seatType: seatType || 'None',
       address: [city.trim(), fullAddress.trim()].filter(Boolean).join(', ') || 'Durgapur',
       tourName: selectedTourName,
       registrationDate: new Date().toISOString().split('T')[0],
@@ -235,6 +237,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
       `🚩 *Tour / Yatra:* ${reg.tourName}\n` +
       `📅 *Destination:* ${currentTourObj?.destination || 'Holy Dham'}\n` +
       `🗓️ *Dates:* ${currentTourObj?.startDate || ''} to ${currentTourObj?.endDate || ''}\n` +
+      `🚆 *Seat / Travel Class:* ${reg.seatType || 'None'}\n` +
       `📞 *Mobile:* ${reg.phoneNumber}\n` +
       `💰 *Total Yatra Fee:* ${formatINR(reg.agreedFee)}\n` +
       `💵 *Amount Paid:* ${formatINR(reg.paidAmount)} (${reg.paymentMethod})\n` +
@@ -250,6 +253,7 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
     setSpiritualName('');
     setDateOfBirth('');
     setAge('');
+    setSeatType('Sleeper Class (SL)');
     setCompletedRegistration(null);
   };
 
@@ -403,6 +407,12 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                       </div>
                     </>
                   )}
+                  <div>
+                    <span className="text-slate-400 text-xs block">Seat Type / Travel Class:</span>
+                    <strong className="text-emerald-400 font-bold">
+                      {completedRegistration.seatType || 'None'}
+                    </strong>
+                  </div>
                   <div>
                     <span className="text-slate-400 text-xs block">Seat Allocation:</span>
                     <span className="text-amber-400 font-medium">
@@ -651,6 +661,27 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                         className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm font-mono focus:outline-none focus:border-orange-500"
                       />
                     </div>
+                  </div>
+
+                  {/* Seat Type Drop Down Menu */}
+                  <div className="text-xs">
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Seat Type (Drop Down Menu) *
+                    </label>
+                    <select
+                      value={seatType}
+                      onChange={(e) => setSeatType(e.target.value as SeatType)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500 cursor-pointer font-medium"
+                    >
+                      {SEAT_TYPE_OPTIONS.map((st) => (
+                        <option key={st} value={st} className="bg-slate-900 text-slate-100">
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[11px] text-slate-400 block mt-1">
+                      Select your preferred travel / coach class for this pilgrimage yatra.
+                    </span>
                   </div>
 
                   {/* Phone & WhatsApp */}

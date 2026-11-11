@@ -21,7 +21,7 @@ import {
   Check,
   AlertTriangle
 } from 'lucide-react';
-import { PassengerRegistration, Tour, RefundStatus } from '../types';
+import { PassengerRegistration, Tour, RefundStatus, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 
 interface PassengersRosterViewProps {
   registrations: PassengerRegistration[];
@@ -68,6 +68,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   const [editPaidAmount, setEditPaidAmount] = useState<number | ''>(0);
   const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'UPI' | 'Bank Transfer'>('UPI');
   const [editSeatNumber, setEditSeatNumber] = useState('');
+  const [editSeatType, setEditSeatType] = useState<SeatType>('None');
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<'paid' | 'partial' | 'unpaid' | 'refunded'>('unpaid');
 
@@ -105,6 +106,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     setEditPaidAmount(reg.paidAmount);
     setEditPaymentMethod(reg.paymentMethod || 'UPI');
     setEditSeatNumber(reg.seatNumber || '');
+    setEditSeatType(reg.seatType || 'None');
     setEditNotes(reg.notes || '');
     setEditStatus(reg.status);
   };
@@ -166,6 +168,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
       dueAmount,
       paymentMethod: editPaymentMethod,
       seatNumber: editSeatNumber.trim() ? editSeatNumber.trim().toUpperCase() : undefined,
+      seatType: editSeatType,
       notes: editNotes.trim(),
       status,
     };
@@ -487,9 +490,14 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                         {reg.registrationNumber}
                       </span>
                       <strong className="text-white text-sm">{reg.fullName}</strong>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
                         {reg.gender && <span className="font-medium text-slate-300">{reg.gender}</span>}
                         {reg.age && <span>• {reg.age} yrs</span>}
+                        {reg.seatType && reg.seatType !== 'None' && (
+                          <span className="bg-orange-500/15 text-orange-400 border border-orange-500/30 px-1.5 py-0.2 rounded font-semibold text-[10px]">
+                            {reg.seatType}
+                          </span>
+                        )}
                         {reg.dateOfBirth && <span>• DOB: {reg.dateOfBirth}</span>}
                         {reg.address && <span>• {reg.address}</span>}
                       </div>
@@ -794,6 +802,20 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                       placeholder="e.g. 1A, 12, S-3"
                       className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-mono uppercase focus:outline-none"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Seat Type</label>
+                    <select
+                      value={editSeatType}
+                      onChange={(e) => setEditSeatType(e.target.value as SeatType)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      {SEAT_TYPE_OPTIONS.map((st) => (
+                        <option key={st} value={st} className="bg-slate-900 text-slate-100">
+                          {st}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="sm:col-span-4">
                     <label className="block text-slate-300 font-semibold mb-1">Residential Address / City</label>

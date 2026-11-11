@@ -13,7 +13,7 @@ import {
   MapPin,
   Clock
 } from 'lucide-react';
-import { PassengerRegistration, Tour } from '../types';
+import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 
 interface RegistrationViewProps {
   registrations: PassengerRegistration[];
@@ -34,6 +34,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [age, setAge] = useState<number | ''>(45);
   const [seatNumber, setSeatNumber] = useState('');
+  const [seatType, setSeatType] = useState<SeatType>('Sleeper Class (SL)');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [address, setAddress] = useState('');
@@ -108,6 +109,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       dateOfBirth: dateOfBirth || undefined,
       age: age ? Number(age) : undefined,
       seatNumber: seatNumber.trim() ? seatNumber.trim().toUpperCase() : undefined,
+      seatType: seatType || 'None',
       phoneNumber: phoneNumber.trim(),
       whatsappNumber: (whatsappNumber || phoneNumber).trim(),
       address: address.trim(),
@@ -136,6 +138,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
     setPaidAmount(0);
     setNotes('');
     setSeatNumber('');
+    setSeatType('Sleeper Class (SL)');
 
     setSuccessNotice(`Registration #${regId} created successfully! Earning and Due accounts updated.`);
     setTimeout(() => setSuccessNotice(null), 5000);
@@ -358,6 +361,23 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                   placeholder="e.g. 1A, 12, S-3"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500 font-mono uppercase"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs">
+                  Seat Type (Drop Down Menu) *
+                </label>
+                <select
+                  value={seatType}
+                  onChange={(e) => setSeatType(e.target.value as SeatType)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500 font-medium cursor-pointer"
+                >
+                  {SEAT_TYPE_OPTIONS.map((st) => (
+                    <option key={st} value={st} className="bg-slate-900 text-slate-100">
+                      {st}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="sm:col-span-2">

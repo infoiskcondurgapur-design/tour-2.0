@@ -33,6 +33,27 @@ export interface Tour {
 
 export type GenderType = 'Male' | 'Female' | 'Other';
 
+export type SeatType = 
+  | 'Sleeper Class (SL)' 
+  | 'AC Three-Tier (3AC)' 
+  | 'AC Two-Tier (2AC)' 
+  | 'Executive Anubhuti (EA)' 
+  | 'Executive Chair Car (EC)' 
+  | 'First Class AC (1A)' 
+  | 'AC Chair Car (CC)' 
+  | 'None';
+
+export const SEAT_TYPE_OPTIONS: SeatType[] = [
+  'Sleeper Class (SL)',
+  'AC Three-Tier (3AC)',
+  'AC Two-Tier (2AC)',
+  'Executive Anubhuti (EA)',
+  'Executive Chair Car (EC)',
+  'First Class AC (1A)',
+  'AC Chair Car (CC)',
+  'None',
+];
+
 export interface VehicleConfig {
   id: string;
   tourName: string;
@@ -66,6 +87,7 @@ export interface PassengerRegistration {
   refundMethod?: 'Cash' | 'UPI' | 'Bank Transfer';
   paymentMethod: 'Cash' | 'UPI' | 'Bank Transfer';
   seatNumber?: string;
+  seatType?: SeatType;
   vehicleName?: string;
   notes?: string;
   status: 'paid' | 'partial' | 'unpaid' | 'refunded';

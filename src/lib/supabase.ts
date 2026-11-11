@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Tour, PassengerRegistration, FinancialTransaction } from '../types';
+import { Tour, PassengerRegistration, FinancialTransaction, SeatType, SEAT_TYPE_OPTIONS } from '../types';
 
 const DEFAULT_URL = import.meta.env.VITE_SUPABASE_URL || 'https://mjwmheedvdabxhsihixc.supabase.co';
 const DEFAULT_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qd21oZWVkdmRhYnhoc2loaXhjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMzNDUxNjEsImV4cCI6MjEwODkyMTE2MX0.BbCnFJy2aIVOFo9i7Yb_KW8_9H4OY5BJgq8KZ4qaeRg';
@@ -128,6 +128,7 @@ export function regToDb(p: PassengerRegistration) {
     refund_method: p.refundMethod || null,
     payment_method: p.paymentMethod,
     seat_number: p.seatNumber || null,
+    seat_type: p.seatType || 'None',
     vehicle_name: p.vehicleName || null,
     notes: p.notes || null,
     status: p.status,
@@ -136,6 +137,18 @@ export function regToDb(p: PassengerRegistration) {
 }
 
 export function regFromDb(r: any): PassengerRegistration {
+  // Extract seatType from r.seat_type or parse from notes as fallback
+  let seatType: SeatType = r.seat_type || 'None';
+  if ((!seatType || seatType === 'None') && r.notes) {
+    const match = r.notes.match(/Seat Type:\s*([^|,\n]+)/i);
+    if (match && match[1]) {
+      const parsed = match[1].trim() as SeatType;
+      if (SEAT_TYPE_OPTIONS.includes(parsed)) {
+        seatType = parsed;
+      }
+    }
+  }
+
   return {
     id: r.id,
     registrationNumber: r.registration_number,
@@ -158,6 +171,7 @@ export function regFromDb(r: any): PassengerRegistration {
     refundMethod: r.refund_method || undefined,
     paymentMethod: r.payment_method || 'Cash',
     seatNumber: r.seat_number || undefined,
+    seatType,
     vehicleName: r.vehicle_name || undefined,
     notes: r.notes || undefined,
     status: r.status || 'unpaid',
@@ -269,7 +283,26 @@ export async function upsertRegistrationInDb(reg: PassengerRegistration): Promis
   const client = getActiveSupabaseClient();
   if (!client) return false;
   try {
-    const { error } = await client.from('tour_registrations').upsert(regToDb(reg), { onConflict: 'id' });
+    const payload = regToDb(reg);
+    let { error } = await client.from('tour_registrations').upsert(payload, { onConflict: 'id' });
+    
+    // If 'seat_type' column does not exist yet on Supabase schema cache (PGRST204), fallback seamlessly
+    if (error && error.code === 'PGRST204' && error.message.includes('seat_type')) {
+      const fallbackPayload: any = { ...payload };
+      delete fallbackPayload.seat_type;
+
+      // Encode Seat Type in notes so it is not lost
+      if (reg.seatType && reg.seatType !== 'None') {
+        const existingNotes = fallbackPayload.notes || '';
+        if (!existingNotes.includes('Seat Type:')) {
+          fallbackPayload.notes = `Seat Type: ${reg.seatType}${existingNotes ? ' | ' + existingNotes : ''}`;
+        }
+      }
+
+      const retryRes = await client.from('tour_registrations').upsert(fallbackPayload, { onConflict: 'id' });
+      error = retryRes.error;
+    }
+
     if (error) {
       console.error('Supabase upsert registration error:', error.message);
       return false;

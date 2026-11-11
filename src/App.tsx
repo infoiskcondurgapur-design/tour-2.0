@@ -1466,6 +1466,7 @@ CREATE TABLE IF NOT EXISTS public.tour_registrations (
   refund_method TEXT,
   payment_method TEXT NOT NULL DEFAULT 'Cash',
   seat_number TEXT,
+  seat_type TEXT DEFAULT 'None',
   vehicle_name TEXT,
   notes TEXT,
   status TEXT NOT NULL DEFAULT 'unpaid',
