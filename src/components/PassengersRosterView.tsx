@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Users, 
   Search, 
@@ -10,19 +10,25 @@ import {
   Compass, 
   UserPlus, 
   CheckCircle2, 
-  X,
-  CreditCard,
-  Phone,
-  Calendar,
-  FileCheck,
-  ArrowRight,
-  Edit3,
-  UserCheck,
-  Check,
-  AlertTriangle,
-  Crown
+  X, 
+  CreditCard, 
+  Phone, 
+  Calendar, 
+  FileCheck, 
+  ArrowRight, 
+  Edit3, 
+  UserCheck, 
+  Check, 
+  AlertTriangle, 
+  Crown,
+  Printer,
+  Share2,
+  Sparkles,
+  QrCode
 } from 'lucide-react';
 import { PassengerRegistration, Tour, RefundStatus, SeatType, SEAT_TYPE_OPTIONS } from '../types';
+import { PilgrimBadgesModal } from './PilgrimBadgesModal';
+import { BroadcastKitModal } from './BroadcastKitModal';
 
 interface PassengersRosterViewProps {
   registrations: PassengerRegistration[];
@@ -60,6 +66,12 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   }, [initialTourFilter]);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [refundStatusFilter, setRefundStatusFilter] = useState('ALL');
+  const [boardingFilter, setBoardingFilter] = useState<'ALL' | 'BOARDED' | 'NOT_BOARDED'>('ALL');
+  const [leaderFilter, setLeaderFilter] = useState<string>('ALL');
+
+  // Modals for Badge Printing & WhatsApp Broadcast Kit
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
@@ -72,6 +84,8 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   const [editAge, setEditAge] = useState<number | ''>(45);
   const [editPhoneNumber, setEditPhoneNumber] = useState('');
   const [editWhatsappNumber, setEditWhatsappNumber] = useState('');
+  const [editEmergencyPhone, setEditEmergencyPhone] = useState('');
+  const [editBloodGroup, setEditBloodGroup] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editTourName, setEditTourName] = useState('');
   const [editAgreedFee, setEditAgreedFee] = useState<number | ''>(5000);
@@ -79,6 +93,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'UPI' | 'Bank Transfer'>('UPI');
   const [editSeatNumber, setEditSeatNumber] = useState('');
   const [editSeatType, setEditSeatType] = useState<SeatType>('None');
+  const [editBoarded, setEditBoarded] = useState(false);
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<'paid' | 'partial' | 'unpaid' | 'refunded'>('unpaid');
 
@@ -101,6 +116,22 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     }).format(val || 0);
   };
 
+  // 1-Tap Boarding Toggle
+  const handleToggleBoarding = (reg: PassengerRegistration) => {
+    const nextBoarded = !reg.boarded;
+    const updated: PassengerRegistration = {
+      ...reg,
+      boarded: nextBoarded,
+    };
+    onUpdateRegistration(updated);
+    setSuccessNotice(
+      nextBoarded
+        ? `✓ Devotee "${reg.fullName}" marked as Boarded / Present (উপস্থিত)!`
+        : `Devotee "${reg.fullName}" marked as Not Boarded (অনুপস্থিত).`
+    );
+    setTimeout(() => setSuccessNotice(null), 3500);
+  };
+
   // Open Edit Modal for a user
   const handleOpenEditModal = (reg: PassengerRegistration) => {
     setEditingTarget(reg);
@@ -111,6 +142,8 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     setEditAge(reg.age ?? '');
     setEditPhoneNumber(reg.phoneNumber);
     setEditWhatsappNumber(reg.whatsappNumber || '');
+    setEditEmergencyPhone(reg.emergencyPhone || '');
+    setEditBloodGroup(reg.bloodGroup || '');
     setEditAddress(reg.address || '');
     setEditTourName(reg.tourName);
     setEditAgreedFee(reg.agreedFee);
@@ -118,6 +151,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     setEditPaymentMethod(reg.paymentMethod || 'UPI');
     setEditSeatNumber(reg.seatNumber || '');
     setEditSeatType(reg.seatType || 'None');
+    setEditBoarded(reg.boarded || false);
     setEditNotes(reg.notes || '');
     setEditStatus(reg.status);
   };
@@ -189,6 +223,8 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
       age: editAge !== '' ? Number(editAge) : undefined,
       phoneNumber: editPhoneNumber.trim(),
       whatsappNumber: (editWhatsappNumber || editPhoneNumber).trim(),
+      emergencyPhone: editEmergencyPhone.trim() || undefined,
+      bloodGroup: editBloodGroup.trim() || undefined,
       address: editAddress.trim(),
       tourName: editTourName.trim(),
       agreedFee: feeNum,
@@ -197,6 +233,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
       paymentMethod: editPaymentMethod,
       seatNumber: editSeatNumber.trim() ? editSeatNumber.trim().toUpperCase() : undefined,
       seatType: editSeatType,
+      boarded: editBoarded,
       notes: editNotes.trim(),
       status,
     };
@@ -265,6 +302,32 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     setRefundTarget(null);
   };
 
+  // Scope registrations for active tour
+  const scopedRegistrations = useMemo(() => {
+    return tourFilter === 'ALL' ? registrations : registrations.filter(r => r.tourName.toLowerCase() === tourFilter.toLowerCase());
+  }, [registrations, tourFilter]);
+
+  const boardingStats = useMemo(() => {
+    const total = scopedRegistrations.length;
+    const boarded = scopedRegistrations.filter(r => r.boarded).length;
+    const pending = total - boarded;
+    const percent = total > 0 ? Math.round((boarded / total) * 100) : 0;
+    return { total, boarded, pending, percent };
+  }, [scopedRegistrations]);
+
+  const distinctLeadersList = useMemo(() => {
+    const set = new Set<string>();
+    scopedRegistrations.forEach(r => {
+      if (r.leaderName?.trim()) set.add(r.leaderName.trim());
+    });
+    return Array.from(set);
+  }, [scopedRegistrations]);
+
+  const currentTourObj = useMemo(() => {
+    if (tourFilter === 'ALL') return tours[0] || null;
+    return tours.find(t => t.name.toLowerCase() === tourFilter.toLowerCase()) || null;
+  }, [tours, tourFilter]);
+
   // Aggregate calculations
   const totalAgreed = registrations.reduce((sum, r) => sum + (r.agreedFee || 0), 0);
   const totalCollected = registrations.reduce((sum, r) => sum + (r.paidAmount || 0), 0);
@@ -289,6 +352,15 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
 
     if (tourFilter !== 'ALL' && r.tourName !== tourFilter) return false;
     if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
+
+    if (boardingFilter !== 'ALL') {
+      if (boardingFilter === 'BOARDED' && !r.boarded) return false;
+      if (boardingFilter === 'NOT_BOARDED' && r.boarded) return false;
+    }
+
+    if (leaderFilter !== 'ALL') {
+      if ((r.leaderName || 'None') !== leaderFilter) return false;
+    }
 
     if (refundStatusFilter !== 'ALL') {
       const currentRefStatus = r.refundStatus || 'not_refunded';
@@ -316,7 +388,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
           {successNotice && (
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 rounded-xl text-xs font-bold animate-in fade-in">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -325,12 +397,63 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
           )}
 
           <button
+            onClick={() => setShowBadgesModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-slate-700/80 hover:border-orange-500/60 hover:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md"
+            title="Generate and print official pilgrim ID cards & badges"
+          >
+            <Printer className="w-4 h-4 text-orange-400" />
+            <span>Print ID Badges</span>
+          </button>
+
+          <button
+            onClick={() => setShowBroadcastModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-slate-700/80 hover:border-emerald-500/60 hover:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer shadow-md"
+            title="Create and share WhatsApp announcements & seat charts"
+          >
+            <Share2 className="w-4 h-4 text-emerald-400" />
+            <span>WhatsApp Broadcast</span>
+          </button>
+
+          <button
             onClick={onNavigateToRegistration}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-orange-500/20 cursor-pointer transition-all"
           >
             <UserPlus className="w-4 h-4" />
-            <span>+ Register New Passenger</span>
+            <span>+ Register Passenger</span>
           </button>
+        </div>
+      </div>
+
+      {/* Boarding & Attendance Check-in Live Bar */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center flex-shrink-0">
+            <UserCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-bold text-white">Yatra Boarding & Attendance Check-in</h4>
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {boardingStats.boarded} / {boardingStats.total} Boarded ({boardingStats.percent}%)
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              1-tap check-in devotees at bus departure or reporting gate • {boardingStats.pending} pending to board
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full sm:w-64">
+          <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+            <span>Boarding Status ({tourFilter === 'ALL' ? 'All Yatras' : tourFilter})</span>
+            <span className="font-mono text-emerald-400 font-bold">{boardingStats.percent}%</span>
+          </div>
+          <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div 
+              className="bg-emerald-500 h-full rounded-full transition-all duration-300"
+              style={{ width: `${boardingStats.percent}%` }}
+            />
+          </div>
         </div>
       </div>
 
@@ -484,6 +607,53 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                 <option value="not_refunded" className="bg-slate-900">Not Refunded</option>
               </select>
             </div>
+
+            {/* Boarding Status Filter */}
+            <div className="flex items-center gap-1.5 bg-slate-800/80 border border-emerald-500/40 rounded-xl px-2.5 py-1 text-emerald-300 font-medium">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <select
+                value={boardingFilter}
+                onChange={(e) => setBoardingFilter(e.target.value as any)}
+                className="bg-transparent text-emerald-200 text-xs focus:outline-none cursor-pointer font-medium"
+              >
+                <option value="ALL" className="bg-slate-900">All Boarding Status</option>
+                <option value="BOARDED" className="bg-slate-900">✓ Boarded / Present</option>
+                <option value="NOT_BOARDED" className="bg-slate-900">⏳ Not Boarded</option>
+              </select>
+            </div>
+
+            {/* Leader Filter */}
+            {distinctLeadersList.length > 0 && (
+              <div className="flex items-center gap-1.5 bg-slate-800/80 border border-amber-500/40 rounded-xl px-2.5 py-1 text-amber-300 font-medium">
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <select
+                  value={leaderFilter}
+                  onChange={(e) => setLeaderFilter(e.target.value)}
+                  className="bg-transparent text-amber-200 text-xs focus:outline-none cursor-pointer font-medium"
+                >
+                  <option value="ALL" className="bg-slate-900">All Group Leaders ({distinctLeadersList.length})</option>
+                  {distinctLeadersList.map(l => (
+                    <option key={l} value={l} className="bg-slate-900">👑 {l}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {(tourFilter !== 'ALL' || statusFilter !== 'ALL' || refundStatusFilter !== 'ALL' || boardingFilter !== 'ALL' || leaderFilter !== 'ALL' || searchQuery) && (
+              <button
+                onClick={() => {
+                  setTourFilter('ALL');
+                  setStatusFilter('ALL');
+                  setRefundStatusFilter('ALL');
+                  setBoardingFilter('ALL');
+                  setLeaderFilter('ALL');
+                  setSearchQuery('');
+                }}
+                className="text-orange-400 hover:text-orange-300 text-xs font-bold underline cursor-pointer ml-auto"
+              >
+                Reset All Filters
+              </button>
+            )}
           </div>
         </div>
 
@@ -501,6 +671,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                 <th className="py-3.5 px-4 text-right">Net In-Hand</th>
                 <th className="py-3.5 px-4 text-right">Due</th>
                 <th className="py-3.5 px-4 text-center">Status</th>
+                <th className="py-3.5 px-4 text-center">Boarding</th>
                 <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -531,6 +702,16 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                         {reg.seatType && reg.seatType !== 'None' && (
                           <span className="bg-orange-500/15 text-orange-400 border border-orange-500/30 px-1.5 py-0.2 rounded font-semibold text-[10px]">
                             {reg.seatType}
+                          </span>
+                        )}
+                        {reg.bloodGroup && (
+                          <span className="bg-rose-500/15 text-rose-300 border border-rose-500/30 px-1.5 py-0.2 rounded font-semibold text-[10px]">
+                            🩸 {reg.bloodGroup}
+                          </span>
+                        )}
+                        {reg.emergencyPhone && (
+                          <span className="text-slate-400 text-[10px]">
+                            • Emerg: {reg.emergencyPhone}
                           </span>
                         )}
                         {reg.dateOfBirth && <span>• DOB: {reg.dateOfBirth}</span>}
@@ -636,6 +817,28 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                       )}
                     </td>
 
+                    {/* Boarding 1-Tap Toggle */}
+                    <td className="py-3 px-4 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => handleToggleBoarding(reg)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                          reg.boarded
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-600'
+                        }`}
+                        title={reg.boarded ? 'Click to mark unboarded' : 'Click to mark boarded (উপস্থিত)'}
+                      >
+                        {reg.boarded ? (
+                          <>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Boarded</span>
+                          </>
+                        ) : (
+                          <span>⏳ Check-in</span>
+                        )}
+                      </button>
+                    </td>
+
                     {/* Actions */}
                     <td className="py-3 px-4 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
@@ -687,7 +890,7 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
 
               {filteredRegistrations.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-16 text-center text-slate-500">
+                  <td colSpan={11} className="py-16 text-center text-slate-500">
                     <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                     <p className="text-sm font-semibold text-slate-400">No passengers found</p>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
@@ -845,6 +1048,34 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                     />
                   </div>
                   <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Emergency Phone</label>
+                    <input
+                      type="text"
+                      value={editEmergencyPhone}
+                      onChange={(e) => setEditEmergencyPhone(e.target.value)}
+                      placeholder="Family contact"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-white font-mono focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Blood Group</label>
+                    <select
+                      value={editBloodGroup}
+                      onChange={(e) => setEditBloodGroup(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2 text-slate-200 focus:outline-none cursor-pointer"
+                    >
+                      <option value="">Not Specified</option>
+                      <option value="A+">A+</option>
+                      <option value="A-">A-</option>
+                      <option value="B+">B+</option>
+                      <option value="B-">B-</option>
+                      <option value="O+">O+</option>
+                      <option value="O-">O-</option>
+                      <option value="AB+">AB+</option>
+                      <option value="AB-">AB-</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-slate-300 font-semibold mb-1">Seat Number</label>
                     <input
                       type="text"
@@ -867,6 +1098,19 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none mt-5">
+                      <input
+                        type="checkbox"
+                        checked={editBoarded}
+                        onChange={(e) => setEditBoarded(e.target.checked)}
+                        className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-slate-900 border-slate-700"
+                      />
+                      <span className="font-bold text-emerald-400 text-xs">
+                        Marked as Boarded / Present (যাত্রী উপস্থিত / বাসে উঠেছেন)
+                      </span>
+                    </label>
                   </div>
                   <div className="sm:col-span-4">
                     <label className="block text-slate-300 font-semibold mb-1">Residential Address / City</label>
@@ -1271,6 +1515,24 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Badges Printing Modal */}
+      <PilgrimBadgesModal
+        isOpen={showBadgesModal}
+        onClose={() => setShowBadgesModal(false)}
+        registrations={scopedRegistrations}
+        tour={currentTourObj}
+        tourName={tourFilter !== 'ALL' ? tourFilter : (scopedRegistrations[0]?.tourName || 'All Tours')}
+      />
+
+      {/* WhatsApp Broadcast Kit Modal */}
+      <BroadcastKitModal
+        isOpen={showBroadcastModal}
+        onClose={() => setShowBroadcastModal(false)}
+        tourName={tourFilter !== 'ALL' ? tourFilter : (scopedRegistrations[0]?.tourName || 'All Tours')}
+        tour={currentTourObj}
+        registrations={scopedRegistrations}
+      />
     </div>
   );
 };

@@ -106,6 +106,23 @@ export function tourFromDb(r: any): Tour {
 }
 
 export function regToDb(p: PassengerRegistration) {
+  let combinedNotes = p.notes || '';
+  if (p.boarded) {
+    if (!combinedNotes.includes('[Boarded: true]')) {
+      combinedNotes = combinedNotes ? `${combinedNotes} | [Boarded: true]` : '[Boarded: true]';
+    }
+  } else {
+    combinedNotes = combinedNotes.replace(/\|\s*\[Boarded:\s*true\]/gi, '').replace(/\[Boarded:\s*true\]/gi, '').trim();
+  }
+  if (p.emergencyPhone) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[Emergency:\s*[^\]]+\]/gi, '').replace(/\[Emergency:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [Emergency: ${p.emergencyPhone}]` : `[Emergency: ${p.emergencyPhone}]`;
+  }
+  if (p.bloodGroup) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[Blood:\s*[^\]]+\]/gi, '').replace(/\[Blood:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [Blood: ${p.bloodGroup}]` : `[Blood: ${p.bloodGroup}]`;
+  }
+
   return {
     id: p.id,
     registration_number: p.registrationNumber,
@@ -131,7 +148,7 @@ export function regToDb(p: PassengerRegistration) {
     seat_number: p.seatNumber || null,
     seat_type: p.seatType || 'None',
     vehicle_name: p.vehicleName || null,
-    notes: p.notes || null,
+    notes: combinedNotes || null,
     status: p.status,
     updated_at: new Date().toISOString(),
   };
@@ -159,6 +176,23 @@ export function regFromDb(r: any): PassengerRegistration {
     }
   }
 
+  // Extract boarded
+  const boarded = r.boarded === true || /\[Boarded:\s*true\]/i.test(r.notes || '');
+
+  // Extract emergencyPhone
+  let emergencyPhone = r.emergency_phone || undefined;
+  if (!emergencyPhone && r.notes) {
+    const match = r.notes.match(/\[Emergency:\s*([^\]]+)\]/i);
+    if (match && match[1]) emergencyPhone = match[1].trim();
+  }
+
+  // Extract bloodGroup
+  let bloodGroup = r.blood_group || undefined;
+  if (!bloodGroup && r.notes) {
+    const match = r.notes.match(/\[Blood:\s*([^\]]+)\]/i);
+    if (match && match[1]) bloodGroup = match[1].trim();
+  }
+
   return {
     id: r.id,
     registrationNumber: r.registration_number,
@@ -169,6 +203,8 @@ export function regFromDb(r: any): PassengerRegistration {
     dateOfBirth: r.date_of_birth || undefined,
     phoneNumber: r.phone_number,
     whatsappNumber: r.whatsapp_number || undefined,
+    emergencyPhone,
+    bloodGroup,
     address: r.address || undefined,
     tourName: r.tour_name,
     registrationDate: r.registration_date,
@@ -184,6 +220,7 @@ export function regFromDb(r: any): PassengerRegistration {
     seatNumber: r.seat_number || undefined,
     seatType,
     vehicleName: r.vehicle_name || undefined,
+    boarded,
     notes: r.notes || undefined,
     status: r.status || 'unpaid',
   };

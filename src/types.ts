@@ -75,6 +75,8 @@ export interface PassengerRegistration {
   dateOfBirth?: string;
   phoneNumber: string;
   whatsappNumber?: string;
+  emergencyPhone?: string;
+  bloodGroup?: string;
   address?: string;
   tourName: string;
   registrationDate: string;
@@ -90,6 +92,7 @@ export interface PassengerRegistration {
   seatNumber?: string;
   seatType?: SeatType;
   vehicleName?: string;
+  boarded?: boolean;
   notes?: string;
   status: 'paid' | 'partial' | 'unpaid' | 'refunded';
 }

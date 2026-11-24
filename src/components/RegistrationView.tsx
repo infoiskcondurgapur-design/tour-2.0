@@ -53,6 +53,8 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [seatType, setSeatType] = useState<SeatType>('Sleeper Class (SL)');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [emergencyPhone, setEmergencyPhone] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
   const [address, setAddress] = useState('');
   const [tourName, setTourName] = useState(tours[0]?.name || '');
   const [agreedFee, setAgreedFee] = useState<number | ''>(tours[0]?.defaultFee || 5000);
@@ -65,6 +67,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   // Duplicate Entry Verification State
   const [duplicateMatch, setDuplicateMatch] = useState<PassengerRegistration | null>(null);
   const [pendingRegData, setPendingRegData] = useState<PassengerRegistration | null>(null);
+  const [pendingKeepGroup, setPendingKeepGroup] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   // Live real-time check: detects if entered Name & Mobile match a prior record
@@ -131,32 +134,37 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
     }
   };
 
-  const commitRegistration = (reg: PassengerRegistration) => {
+  const commitRegistration = (reg: PassengerRegistration, keepGroup: boolean = false) => {
     onAddRegistration(reg);
 
-    // Reset Form
+    // Reset Form fields
     setFullName('');
-    setLeaderName('');
-    setGender('Male');
-    setDateOfBirth('');
-    setAge(45);
     setPhoneNumber('');
     setWhatsappNumber('');
-    setAddress('');
+    setEmergencyPhone('');
+    setBloodGroup('');
+    setDateOfBirth('');
+    setAge(45);
+    setSeatNumber('');
     setPaidAmount(0);
     setNotes('');
-    setSeatNumber('');
-    setSeatType('Sleeper Class (SL)');
     setDuplicateMatch(null);
     setPendingRegData(null);
     setShowDuplicateModal(false);
 
-    setSuccessNotice(`Registration #${reg.registrationNumber} created successfully! Earning and Due accounts updated.`);
+    if (!keepGroup) {
+      setLeaderName('');
+      setAddress('');
+      setSeatType('Sleeper Class (SL)');
+      setSuccessNotice(`Registration #${reg.registrationNumber} created successfully! Earning and Due accounts updated.`);
+    } else {
+      setSuccessNotice(`Registration #${reg.registrationNumber} recorded! Leader "${reg.leaderName || 'group'}" and Tour settings kept for next devotee.`);
+    }
+
     setTimeout(() => setSuccessNotice(null), 5000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleProcessSubmit = (keepGroup: boolean = false) => {
     if (!fullName || !phoneNumber || !tourName || feeNum <= 0) {
       alert('Please fill in required fields (Name, Phone, Tour Name, and Agreed Fee).');
       return;
@@ -180,6 +188,8 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       seatType: seatType || 'None',
       phoneNumber: phoneNumber.trim(),
       whatsappNumber: (whatsappNumber || phoneNumber).trim(),
+      emergencyPhone: emergencyPhone.trim() || undefined,
+      bloodGroup: bloodGroup.trim() || undefined,
       address: address.trim(),
       tourName: tourName.trim(),
       registrationDate: regDate,
@@ -203,11 +213,17 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
     if (existingDuplicate) {
       setDuplicateMatch(existingDuplicate);
       setPendingRegData(newReg);
+      setPendingKeepGroup(keepGroup);
       setShowDuplicateModal(true);
       return;
     }
 
-    commitRegistration(newReg);
+    commitRegistration(newReg, keepGroup);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleProcessSubmit(false);
   };
 
   return (
@@ -440,6 +456,42 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
 
               <div>
                 <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Emergency Phone</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                </label>
+                <input
+                  type="text"
+                  value={emergencyPhone}
+                  onChange={(e) => setEmergencyPhone(e.target.value)}
+                  placeholder="Family / kin contact number"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Blood Group</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                </label>
+                <select
+                  value={bloodGroup}
+                  onChange={(e) => setBloodGroup(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-orange-500"
+                >
+                  <option value="">Not Specified</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
                   <span>Seat # (Direct Entry)</span>
                   <span className="text-[10px] text-amber-400/90 font-normal">Optional</span>
                 </label>
@@ -600,14 +652,23 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
             </div>
           </div>
 
-          {/* Submit Button */}
-          <div className="pt-2">
+          {/* Submit Actions */}
+          <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => handleProcessSubmit(true)}
+              className="w-full py-3.5 bg-slate-900 border-2 border-orange-500/50 hover:border-orange-500 hover:bg-slate-800 text-orange-400 hover:text-orange-300 font-extrabold rounded-2xl shadow-lg transition-all cursor-pointer text-xs sm:text-sm flex items-center justify-center gap-2 group active:scale-95"
+            >
+              <Crown className="w-4 h-4 text-orange-400 group-hover:scale-110 transition-transform" />
+              <span>Save & Add Next in Group</span>
+            </button>
+
             <button
               type="submit"
-              className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black rounded-2xl shadow-xl shadow-orange-500/20 transition-all cursor-pointer text-sm sm:text-base flex items-center justify-center gap-2"
+              className="w-full py-3.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black rounded-2xl shadow-xl shadow-orange-500/20 transition-all cursor-pointer text-xs sm:text-sm flex items-center justify-center gap-2 active:scale-95"
             >
               <UserPlus className="w-5 h-5" />
-              <span>Complete Registration & Post to Accounts</span>
+              <span>Complete Registration</span>
             </button>
           </div>
         </form>
@@ -632,7 +693,7 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
           setPendingRegData(null);
         }}
         duplicate={duplicateMatch}
-        onProceedAnyway={pendingRegData ? () => commitRegistration(pendingRegData) : undefined}
+        onProceedAnyway={pendingRegData ? () => commitRegistration(pendingRegData, pendingKeepGroup) : undefined}
         onViewExisting={() => {
           setShowDuplicateModal(false);
           setPendingRegData(null);

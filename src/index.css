@@ -241,3 +241,35 @@ html.day-mode #registration-slip {
   border-color: #e2e8f0 !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08) !important;
 }
+
+/* =========================================================================
+   UNIVERSAL PRINT STYLES
+   Ensures badges, slips, and manifests print cleanly on physical paper
+   ========================================================================= */
+@media print {
+  body {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  aside, 
+  header, 
+  nav, 
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .min-h-screen, 
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

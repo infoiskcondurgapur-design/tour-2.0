@@ -806,6 +806,26 @@ export function App() {
             </div>
 
             <div className="flex items-center gap-2.5">
+              {/* Global Tour Scope Selector in Top Header */}
+              {uniqueTours.length > 0 && (
+                <div className="hidden md:flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/80 rounded-xl px-2.5 py-1.5 text-xs text-slate-200">
+                  <Compass className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                  <select
+                    value={selectedTour}
+                    onChange={(e) => setSelectedTour(e.target.value)}
+                    className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer max-w-[140px] truncate"
+                    title="Active Tour Context"
+                  >
+                    <option value="ALL" className="bg-slate-900">All Tours</option>
+                    {uniqueTours.map((name) => (
+                      <option key={name} value={name} className="bg-slate-900">
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Database Status Indicator */}
               <button
                 onClick={() => setShowDbModal(true)}

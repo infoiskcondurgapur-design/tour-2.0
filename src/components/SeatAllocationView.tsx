@@ -24,9 +24,12 @@ import {
   Lock,
   Unlock,
   MousePointerClick,
-  Edit3
+  Edit3,
+  Share2
 } from 'lucide-react';
 import { PassengerRegistration, Tour, VehicleConfig, GenderType } from '../types';
+import { PilgrimBadgesModal } from './PilgrimBadgesModal';
+import { BroadcastKitModal } from './BroadcastKitModal';
 
 interface SeatAllocationViewProps {
   tours: Tour[];
@@ -65,6 +68,8 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
 
   // View Mode: 'table' (Sl. No, Full Name, Gender, Age, Seat Number) vs 'coach_map' (Visual Layout)
   const [viewMode, setViewMode] = useState<'table' | 'coach_map'>('table');
+  const [showBadgesModal, setShowBadgesModal] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
   // Filter States for Table
   const [searchQuery, setSearchQuery] = useState('');
@@ -507,6 +512,26 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
               <span>Coach Map</span>
             </button>
           </div>
+
+          {/* Print Badges Button */}
+          <button
+            onClick={() => setShowBadgesModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-slate-700/80 hover:border-orange-500/60 hover:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+            title="Print ID Cards & Pass Badges for this tour"
+          >
+            <Printer className="w-4 h-4 text-orange-400" />
+            <span>ID Badges</span>
+          </button>
+
+          {/* WhatsApp Broadcast Button */}
+          <button
+            onClick={() => setShowBroadcastModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 border border-slate-700/80 hover:border-emerald-500/60 hover:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer"
+            title="Broadcast Seat Chart & departure announcement"
+          >
+            <Share2 className="w-4 h-4 text-emerald-400" />
+            <span>Broadcast Seats</span>
+          </button>
 
           {/* Print Manifest Button */}
           <button
@@ -1694,6 +1719,24 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Badges Printing Modal */}
+      <PilgrimBadgesModal
+        isOpen={showBadgesModal}
+        onClose={() => setShowBadgesModal(false)}
+        registrations={tourPilgrims}
+        tour={tours.find(t => (t.name || '').toLowerCase() === (selectedTourName || '').toLowerCase()) || null}
+        tourName={selectedTourName}
+      />
+
+      {/* WhatsApp Broadcast Kit Modal */}
+      <BroadcastKitModal
+        isOpen={showBroadcastModal}
+        onClose={() => setShowBroadcastModal(false)}
+        tourName={selectedTourName}
+        tour={tours.find(t => (t.name || '').toLowerCase() === (selectedTourName || '').toLowerCase()) || null}
+        registrations={tourPilgrims}
+      />
     </div>
   );
 };
