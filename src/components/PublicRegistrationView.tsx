@@ -20,9 +20,11 @@ import {
   ChevronRight,
   Info,
   AlertTriangle,
-  Crown
+  Crown,
+  Train
 } from 'lucide-react';
-import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
+import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS, BERTH_PREFERENCE_OPTIONS, BerthPreference } from '../types';
+import { COMMON_BOARDING_STATIONS } from '../utils/railway';
 import { PwaInstallPrompt } from './PwaInstallPrompt';
 import { ThemeToggle } from '../context/ThemeContext';
 import { DuplicateEntryModal } from './DuplicateEntryModal';
@@ -86,6 +88,8 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [age, setAge] = useState<number | ''>('');
   const [seatType, setSeatType] = useState<SeatType>('Sleeper Class (SL)');
+  const [berthPreference, setBerthPreference] = useState<BerthPreference | string>('No Preference');
+  const [boardingStation, setBoardingStation] = useState('Durgapur (DGR)');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [sameAsCalling, setSameAsCalling] = useState(true);
@@ -262,6 +266,8 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
       phoneNumber: phoneNumber.trim(),
       whatsappNumber: finalWhatsApp,
       seatType: seatType || 'None',
+      berthPreference: berthPreference !== 'No Preference' ? berthPreference : undefined,
+      boardingStation: boardingStation.trim() || undefined,
       address: [city.trim(), fullAddress.trim()].filter(Boolean).join(', ') || 'Durgapur',
       tourName: selectedTourName,
       registrationDate: new Date().toISOString().split('T')[0],
@@ -303,6 +309,8 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
       `📅 *Destination:* ${currentTourObj?.destination || 'Holy Dham'}\n` +
       `🗓️ *Dates:* ${currentTourObj?.startDate || ''} to ${currentTourObj?.endDate || ''}\n` +
       `🚆 *Seat / Travel Class:* ${reg.seatType || 'None'}\n` +
+      (reg.berthPreference ? `🛏️ *Berth Preference:* ${reg.berthPreference}\n` : '') +
+      (reg.boardingStation ? `🚉 *Boarding Station:* ${reg.boardingStation}\n` : '') +
       `📞 *Mobile:* ${reg.phoneNumber}\n` +
       `💰 *Total Yatra Fee:* ${formatINR(reg.agreedFee)}\n` +
       `💵 *Amount Paid:* ${formatINR(reg.paidAmount)} (${reg.paymentMethod})\n` +
@@ -776,6 +784,52 @@ export const PublicRegistrationView: React.FC<PublicRegistrationViewProps> = ({
                     <span className="text-[11px] text-slate-400 block mt-1">
                       Select your preferred travel / coach class for this pilgrimage yatra.
                     </span>
+                  </div>
+
+                  {/* Berth Preference & Boarding Station */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                        <span>Berth Preference (বার্থ পছন্দ)</span>
+                        <span className="text-[10px] text-emerald-400 font-normal">Senior Priority</span>
+                      </label>
+                      <select
+                        value={berthPreference}
+                        onChange={(e) => setBerthPreference(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500 cursor-pointer font-medium"
+                      >
+                        {BERTH_PREFERENCE_OPTIONS.map((bp) => (
+                          <option key={bp} value={bp} className="bg-slate-900 text-slate-100">
+                            {bp}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Lower berth is prioritized for elderly devotees.
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1">
+                        Boarding Station (ছাড়ার স্টেশন)
+                      </label>
+                      <input
+                        type="text"
+                        value={boardingStation}
+                        onChange={(e) => setBoardingStation(e.target.value)}
+                        placeholder="e.g. Durgapur (DGR) / Howrah"
+                        list="public-boarding-stns"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500"
+                      />
+                      <datalist id="public-boarding-stns">
+                        {COMMON_BOARDING_STATIONS.map((st) => (
+                          <option key={st} value={st} />
+                        ))}
+                      </datalist>
+                      <span className="text-[10px] text-slate-400 block mt-1">
+                        Station where you will board the train/bus.
+                      </span>
+                    </div>
                   </div>
 
                   {/* Phone & WhatsApp */}

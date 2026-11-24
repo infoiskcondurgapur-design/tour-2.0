@@ -12,9 +12,11 @@ import {
   Copy,
   Layers,
   Sparkles,
-  QrCode
+  QrCode,
+  Train
 } from 'lucide-react';
 import { PassengerRegistration, Tour } from '../types';
+import { getIndianRailwaysBerthType, extractBerthNumber } from '../utils/railway';
 
 interface PilgrimBadgesModalProps {
   isOpen: boolean;
@@ -231,31 +233,60 @@ export const PilgrimBadgesModal: React.FC<PilgrimBadgesModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Seat Number Stamp */}
-                        <div className={`px-3 py-1.5 rounded-xl border ${themeStyles.seatBg} text-center flex-shrink-0 min-w-[70px]`}>
-                          <span className="text-[9px] uppercase font-bold tracking-wider block opacity-75">
-                            Seat
-                          </span>
-                          <span className="text-lg font-extrabold font-mono leading-none block">
-                            {pilgrim.seatNumber || '—'}
-                          </span>
-                        </div>
+                        {/* Seat / Berth Stamp */}
+                        {(() => {
+                          const bNum = extractBerthNumber(pilgrim.seatNumber);
+                          const bInfo = bNum ? getIndianRailwaysBerthType(bNum) : null;
+                          return (
+                            <div className={`px-3 py-1.5 rounded-xl border ${themeStyles.seatBg} text-center flex-shrink-0 min-w-[70px]`}>
+                              <span className="text-[9px] uppercase font-bold tracking-wider block opacity-75">
+                                {bInfo ? 'Berth' : 'Seat'}
+                              </span>
+                              <span className="text-base sm:text-lg font-extrabold font-mono leading-none block">
+                                {pilgrim.seatNumber || '—'}
+                              </span>
+                              {bInfo && (
+                                <span className="text-[8px] font-bold block mt-0.5 tracking-tight uppercase">
+                                  {bInfo.code}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
-                      {/* Travel & Bus Info */}
+                      {/* Travel & Train / Coach Info */}
                       <div className="grid grid-cols-2 gap-2 text-xs bg-slate-950/60 print:bg-slate-50 p-2.5 rounded-xl border border-slate-800/80 print:border-slate-200">
                         <div>
-                          <span className="text-[10px] text-slate-500 uppercase block font-semibold">Bus / Coach</span>
+                          <span className="text-[10px] text-slate-500 uppercase block font-semibold">Coach / Vehicle</span>
                           <strong className="text-slate-200 print:text-black truncate block">
-                            {pilgrim.vehicleName || 'Coach 1'}
+                            {pilgrim.vehicleName || 'Coach S1'}
                           </strong>
                         </div>
                         <div>
-                          <span className="text-[10px] text-slate-500 uppercase block font-semibold">Seat Type</span>
+                          <span className="text-[10px] text-slate-500 uppercase block font-semibold">Class / Type</span>
                           <strong className="text-slate-200 print:text-black truncate block">
-                            {pilgrim.seatType || 'General'}
+                            {pilgrim.seatType || 'Sleeper (SL)'}
                           </strong>
                         </div>
+                        {(tour?.trainNumber || tour?.trainName || pilgrim.pnrNumber) && (
+                          <div className="col-span-2 pt-1 border-t border-slate-800/60 print:border-slate-200 flex items-center justify-between text-[10px]">
+                            <span className="text-slate-300 print:text-slate-700 font-mono flex items-center gap-1">
+                              <Train className="w-3 h-3 text-sky-400 print:text-sky-700" />
+                              <span>{tour?.trainNumber ? `${tour.trainNumber} ` : ''}{tour?.trainName || 'Train Yatra'}</span>
+                            </span>
+                            {pilgrim.pnrNumber && (
+                              <span className="font-mono font-bold text-sky-400 print:text-sky-800">
+                                PNR: {pilgrim.pnrNumber}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {pilgrim.boardingStation && (
+                          <div className="col-span-2 text-[10px] text-slate-400 print:text-slate-600">
+                            Boarding: <strong className="text-slate-200 print:text-black">{pilgrim.boardingStation}</strong>
+                          </div>
+                        )}
                         {pilgrim.leaderName && (
                           <div className="col-span-2 pt-1 border-t border-slate-800/60 print:border-slate-200">
                             <span className="text-[10px] text-slate-500 uppercase font-semibold">Group Leader: </span>

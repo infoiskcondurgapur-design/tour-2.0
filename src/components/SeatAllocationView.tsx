@@ -25,9 +25,18 @@ import {
   Unlock,
   MousePointerClick,
   Edit3,
-  Share2
+  Share2,
+  Train,
+  Ticket
 } from 'lucide-react';
-import { PassengerRegistration, Tour, VehicleConfig, GenderType } from '../types';
+import { PassengerRegistration, Tour, VehicleConfig, GenderType, CoachType } from '../types';
+import { 
+  getIndianRailwaysBerthType, 
+  extractBerthNumber, 
+  getFormattedBerthLabel,
+  POPULAR_YATRA_TRAINS,
+  COMMON_BOARDING_STATIONS
+} from '../utils/railway';
 import { PilgrimBadgesModal } from './PilgrimBadgesModal';
 import { BroadcastKitModal } from './BroadcastKitModal';
 
@@ -71,9 +80,30 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
   const [showBadgesModal, setShowBadgesModal] = useState(false);
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
+  // Selected Tour Object & Transportation Mode
+  const selectedTourObj = useMemo(() => {
+    return tours.find(t => t.name === selectedTourName) || null;
+  }, [tours, selectedTourName]);
+
+  const isTrainTour = useMemo(() => {
+    if (!selectedTourObj) {
+      return (
+        selectedTourName.toLowerCase().includes('train') ||
+        selectedTourName.toLowerCase().includes('rail') ||
+        selectedTourName.toLowerCase().includes('express')
+      );
+    }
+    return (
+      selectedTourObj.transportType === 'train' ||
+      selectedTourObj.transportType === 'mixed' ||
+      Boolean(selectedTourObj.trainNumber) ||
+      Boolean(selectedTourObj.trainName)
+    );
+  }, [selectedTourObj, selectedTourName]);
+
   // Filter States for Table
   const [searchQuery, setSearchQuery] = useState('');
-  const [seatFilter, setSeatFilter] = useState<'ALL' | 'ASSIGNED' | 'UNASSIGNED' | 'MALE' | 'FEMALE' | 'SENIOR'>('ALL');
+  const [seatFilter, setSeatFilter] = useState<'ALL' | 'ASSIGNED' | 'UNASSIGNED' | 'MALE' | 'FEMALE' | 'SENIOR' | 'LOWER_BERTH' | 'MIDDLE_BERTH' | 'UPPER_BERTH'>('ALL');
 
   // Vehicles list with localStorage fallback
   const [vehicles, setVehicles] = useState<VehicleConfig[]>(() => {
@@ -85,12 +115,13 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
       {
         id: 'veh-default-1',
         tourName: tours[0]?.name || 'General Tour',
-        vehicleName: 'Bus 1 (AC 2x2 Deluxe)',
-        vehicleNumber: 'WB-02-YATRA-01',
-        driverName: 'Driver Sharma',
-        driverPhone: '+91 98311 22334',
-        totalSeats: 40,
-        layout: '2x2',
+        vehicleName: 'Coach S1 (Sleeper - 72 Berths)',
+        vehicleType: 'train',
+        coachType: 'sleeper',
+        trainNumber: '12802',
+        trainName: 'Purushottam Express',
+        totalSeats: 72,
+        layout: 'train_sleeper',
       }
     ];
   });
@@ -99,6 +130,20 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
   const activeTourVehicles = useMemo(() => {
     const list = vehicles.filter(v => v.tourName === selectedTourName);
     if (list.length === 0) {
+      if (isTrainTour) {
+        const defaultCoach: VehicleConfig = {
+          id: 'veh-' + Date.now(),
+          tourName: selectedTourName,
+          vehicleName: 'Coach S1 (Sleeper - 72 Berths)',
+          vehicleType: 'train',
+          coachType: 'sleeper',
+          trainNumber: selectedTourObj?.trainNumber || '12802',
+          trainName: selectedTourObj?.trainName || 'Purushottam Express',
+          totalSeats: 72,
+          layout: 'train_sleeper',
+        };
+        return [defaultCoach];
+      }
       const defaultBus: VehicleConfig = {
         id: 'veh-' + Date.now(),
         tourName: selectedTourName,
@@ -110,10 +155,23 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
       return [defaultBus];
     }
     return list;
-  }, [vehicles, selectedTourName]);
+  }, [vehicles, selectedTourName, isTrainTour, selectedTourObj]);
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(activeTourVehicles[0]?.id || '');
   const activeVehicle = activeTourVehicles.find(v => v.id === selectedVehicleId) || activeTourVehicles[0];
+
+  const isTrainCoach = useMemo(() => {
+    if (!activeVehicle) return isTrainTour;
+    return (
+      activeVehicle.vehicleType === 'train' ||
+      activeVehicle.coachType !== undefined ||
+      activeVehicle.layout?.startsWith('train_') ||
+      activeVehicle.vehicleName?.toLowerCase().includes('coach') ||
+      activeVehicle.vehicleName?.toLowerCase().includes('sleeper') ||
+      activeVehicle.vehicleName?.toLowerCase().includes('3ac') ||
+      isTrainTour
+    );
+  }, [activeVehicle, isTrainTour]);
 
   // Save vehicles
   const saveVehicles = (newVehicles: VehicleConfig[]) => {
@@ -206,10 +264,14 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
     setTimeout(() => setNotice(null), 3000);
   };
 
-  // New Bus Form
-  const [newBusName, setNewBusName] = useState('Bus 2 (AC Deluxe)');
+  // New Vehicle / Coach Form
+  const [newVehType, setNewVehType] = useState<'bus' | 'train'>(isTrainTour ? 'train' : 'bus');
+  const [newCoachType, setNewCoachType] = useState<CoachType>('sleeper');
+  const [newTrainNumber, setNewTrainNumber] = useState(selectedTourObj?.trainNumber || '12802');
+  const [newTrainName, setNewTrainName] = useState(selectedTourObj?.trainName || 'Purushottam Express');
+  const [newBusName, setNewBusName] = useState(isTrainTour ? 'Coach S2 (Sleeper - 72 Berths)' : 'Bus 2 (AC Deluxe)');
   const [newBusNumber, setNewBusNumber] = useState('');
-  const [newBusSeats, setNewBusSeats] = useState<number>(40);
+  const [newBusSeats, setNewBusSeats] = useState<number>(isTrainTour ? 72 : 40);
   const [newDriverName, setNewDriverName] = useState('');
   const [newDriverPhone, setNewDriverPhone] = useState('');
 
@@ -240,10 +302,29 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
     return tourPilgrims.filter(p => !p.seatNumber);
   }, [tourPilgrims]);
 
-  // Generate 2x2 standard Seat Layout for this vehicle (e.g. 1A, 1B, 1C, 1D ...)
+  // Generate Seat / Berth Layout for this vehicle
   const seatLayoutList = useMemo(() => {
-    const count = activeVehicle?.totalSeats || 40;
-    const seats: { id: string; label: string; row: number; col: 'A' | 'B' | 'C' | 'D' }[] = [];
+    const count = activeVehicle?.totalSeats || (isTrainCoach ? 72 : 40);
+    if (isTrainCoach) {
+      const seats: { id: string; label: string; row: number; col: any; berthInfo: any }[] = [];
+      const coachType: CoachType = activeVehicle?.coachType || 
+        (activeVehicle?.layout === 'train_3ac' ? '3ac' : 
+         activeVehicle?.layout === 'train_2ac' ? '2ac' : 
+         activeVehicle?.layout === 'train_cc' ? 'cc' : 'sleeper');
+      for (let num = 1; num <= count; num++) {
+        const berthInfo = getIndianRailwaysBerthType(num, coachType);
+        seats.push({
+          id: `${num}`,
+          label: `Berth ${num} (${berthInfo.code})`,
+          row: Math.ceil(num / (coachType === '2ac' ? 6 : 8)),
+          col: berthInfo.code as any,
+          berthInfo,
+        });
+      }
+      return seats;
+    }
+
+    const seats: { id: string; label: string; row: number; col: 'A' | 'B' | 'C' | 'D'; berthInfo?: any }[] = [];
     const rowsCount = Math.ceil(count / 4);
 
     let currentNum = 1;
@@ -262,12 +343,24 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
       });
     }
     return seats;
-  }, [activeVehicle]);
+  }, [activeVehicle, isTrainCoach]);
+
+  // Robust seat occupant lookup (matches exact seat ID or numeric train berth)
+  const getOccupantForSeat = (seatId: string): PassengerRegistration | undefined => {
+    if (seatOccupantMap.has(seatId)) return seatOccupantMap.get(seatId);
+    if (isTrainCoach) {
+      const num = parseInt(seatId, 10);
+      if (!isNaN(num)) {
+        return seatedInThisVehicle.find(p => extractBerthNumber(p.seatNumber) === num);
+      }
+    }
+    return undefined;
+  };
 
   // Vacant seats on this vehicle
   const vacantSeats = useMemo(() => {
-    return seatLayoutList.filter(s => !seatOccupantMap.has(s.id));
-  }, [seatLayoutList, seatOccupantMap]);
+    return seatLayoutList.filter(s => !getOccupantForSeat(s.id));
+  }, [seatLayoutList, seatOccupantMap, seatedInThisVehicle, isTrainCoach]);
 
   // Unlock seat for editing upon triple-click
   const unlockSeatForEdit = (pilgrim: PassengerRegistration) => {
@@ -386,7 +479,7 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
     setTimeout(() => setNotice(null), 3000);
   };
 
-  // Auto Assign all unseated pilgrims
+  // Auto Assign unseated pilgrims (Intelligent Lower Berth priority for seniors in Train)
   const handleAutoAssign = () => {
     if (unseatedPilgrims.length === 0) {
       alert('All registered pilgrims for this tour already have seats assigned!');
@@ -394,23 +487,63 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
     }
 
     if (vacantSeats.length === 0) {
-      alert('No vacant seats available on this vehicle. Please add another vehicle or free seats.');
+      alert('No vacant seats available on this vehicle. Please add another coach/bus or free seats.');
       return;
     }
 
     const updates: { passengerId: string; seatNumber: string; vehicleName: string }[] = [];
-    const countToAssign = Math.min(unseatedPilgrims.length, vacantSeats.length);
 
-    for (let i = 0; i < countToAssign; i++) {
-      updates.push({
-        passengerId: unseatedPilgrims[i].id,
-        seatNumber: vacantSeats[i].id,
-        vehicleName: activeVehicle.vehicleName,
-      });
+    if (isTrainCoach) {
+      // 1. Separate seniors (age >= 60 or requested Lower berth) vs general devotees
+      const seniorPilgrims = unseatedPilgrims.filter(p => (p.age || 0) >= 60 || p.berthPreference?.includes('Lower'));
+      const generalPilgrims = unseatedPilgrims.filter(p => !((p.age || 0) >= 60 || p.berthPreference?.includes('Lower')));
+
+      const lowerBerths = vacantSeats.filter(s => s.berthInfo?.isLower);
+      const upperBerths = vacantSeats.filter(s => !s.berthInfo?.isLower);
+
+      const assignedPilgrimIds = new Set<string>();
+      const assignedSeatIds = new Set<string>();
+
+      // Prioritize senior citizens to lower berths
+      let sIdx = 0;
+      let lbIdx = 0;
+      while (sIdx < seniorPilgrims.length && lbIdx < lowerBerths.length) {
+        updates.push({
+          passengerId: seniorPilgrims[sIdx].id,
+          seatNumber: lowerBerths[lbIdx].id,
+          vehicleName: activeVehicle.vehicleName,
+        });
+        assignedPilgrimIds.add(seniorPilgrims[sIdx].id);
+        assignedSeatIds.add(lowerBerths[lbIdx].id);
+        sIdx++;
+        lbIdx++;
+      }
+
+      // Assign remaining pilgrims to remaining vacant berths
+      const remainingPilgrims = [...seniorPilgrims.slice(sIdx), ...generalPilgrims];
+      const remainingSeats = vacantSeats.filter(s => !assignedSeatIds.has(s.id));
+
+      const count = Math.min(remainingPilgrims.length, remainingSeats.length);
+      for (let i = 0; i < count; i++) {
+        updates.push({
+          passengerId: remainingPilgrims[i].id,
+          seatNumber: remainingSeats[i].id,
+          vehicleName: activeVehicle.vehicleName,
+        });
+      }
+    } else {
+      const countToAssign = Math.min(unseatedPilgrims.length, vacantSeats.length);
+      for (let i = 0; i < countToAssign; i++) {
+        updates.push({
+          passengerId: unseatedPilgrims[i].id,
+          seatNumber: vacantSeats[i].id,
+          vehicleName: activeVehicle.vehicleName,
+        });
+      }
     }
 
     onBatchUpdateSeats(updates);
-    setNotice(`Auto-assigned & locked ${countToAssign} pilgrims!`);
+    setNotice(`Auto-assigned & locked ${updates.length} devotees (Senior Lower Berth priority)!`);
     setTimeout(() => setNotice(null), 4000);
   };
 
@@ -421,11 +554,15 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
       id: 'veh-' + Date.now(),
       tourName: selectedTourName,
       vehicleName: newBusName.trim(),
+      vehicleType: newVehType,
+      coachType: newVehType === 'train' ? newCoachType : undefined,
+      trainNumber: newVehType === 'train' ? newTrainNumber.trim() : undefined,
+      trainName: newVehType === 'train' ? newTrainName.trim() : undefined,
       vehicleNumber: newBusNumber.trim(),
-      totalSeats: Number(newBusSeats || 40),
+      totalSeats: Number(newBusSeats || (newVehType === 'train' ? 72 : 40)),
       driverName: newDriverName.trim(),
       driverPhone: newDriverPhone.trim(),
-      layout: '2x2',
+      layout: newVehType === 'train' ? `train_${newCoachType}` as any : '2x2',
     };
 
     const updated = [...vehicles, newVeh];
@@ -448,7 +585,9 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
           (p.leaderName && p.leaderName.toLowerCase().includes(q)) ||
           p.phoneNumber.includes(q) ||
           p.registrationNumber.toLowerCase().includes(q) ||
-          (p.seatNumber && p.seatNumber.toLowerCase().includes(q))
+          (p.seatNumber && p.seatNumber.toLowerCase().includes(q)) ||
+          (p.pnrNumber && p.pnrNumber.toLowerCase().includes(q)) ||
+          (p.boardingStation && p.boardingStation.toLowerCase().includes(q))
         );
         if (!match) return false;
       }
@@ -459,10 +598,31 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
       if (seatFilter === 'MALE' && p.gender !== 'Male') return false;
       if (seatFilter === 'FEMALE' && p.gender !== 'Female') return false;
       if (seatFilter === 'SENIOR' && (!p.age || p.age < 60)) return false;
+      if (seatFilter === 'LOWER_BERTH') {
+        if (!p.seatNumber) return false;
+        const bNum = extractBerthNumber(p.seatNumber);
+        if (!bNum) return false;
+        const info = getIndianRailwaysBerthType(bNum, activeVehicle?.coachType || 'sleeper');
+        if (!info.isLower) return false;
+      }
+      if (seatFilter === 'MIDDLE_BERTH') {
+        if (!p.seatNumber) return false;
+        const bNum = extractBerthNumber(p.seatNumber);
+        if (!bNum) return false;
+        const info = getIndianRailwaysBerthType(bNum, activeVehicle?.coachType || 'sleeper');
+        if (info.code !== 'MB') return false;
+      }
+      if (seatFilter === 'UPPER_BERTH') {
+        if (!p.seatNumber) return false;
+        const bNum = extractBerthNumber(p.seatNumber);
+        if (!bNum) return false;
+        const info = getIndianRailwaysBerthType(bNum, activeVehicle?.coachType || 'sleeper');
+        if (info.code !== 'UB' && info.code !== 'SU') return false;
+      }
 
       return true;
     });
-  }, [tourPilgrims, searchQuery, seatFilter]);
+  }, [tourPilgrims, searchQuery, seatFilter, activeVehicle]);
 
   return (
     <div className="space-y-6">
@@ -729,11 +889,16 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/60 text-xs">
               {[
                 { id: 'ALL', label: 'All Pilgrims' },
-                { id: 'ASSIGNED', label: 'Allocated Seats' },
-                { id: 'UNASSIGNED', label: 'Unassigned Seats' },
+                { id: 'ASSIGNED', label: 'Allocated' },
+                { id: 'UNASSIGNED', label: 'Unassigned' },
+                ...(isTrainCoach ? [
+                  { id: 'LOWER_BERTH', label: '🟢 Lower Berths (LB/SL)' },
+                  { id: 'MIDDLE_BERTH', label: '🟡 Middle Berths (MB)' },
+                  { id: 'UPPER_BERTH', label: '🔵 Upper Berths (UB/SU)' },
+                ] : []),
+                { id: 'SENIOR', label: '👴 Seniors (Age 60+)' },
                 { id: 'MALE', label: 'Male (পুরুষ)' },
                 { id: 'FEMALE', label: 'Female (মহিলা)' },
-                { id: 'SENIOR', label: 'Seniors (Age 60+)' },
               ].map(f => (
                 <button
                   key={f.id}
@@ -913,21 +1078,58 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
                         ) : isSeated ? (
                           /* LOCKED SEAT BADGE (Triple-click to edit) */
                           <div className="flex flex-col items-center">
-                            <div
-                              onClick={(e) => handleSeatClick(e, pilgrim)}
-                              className="cursor-pointer select-none group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:border-amber-400 hover:bg-emerald-500/25 transition-all shadow-xs"
-                              title="🔒 Seat is locked! Triple-click here to edit"
-                            >
-                              <Lock className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
-                              <span className="text-white text-xs font-black tracking-wide">{pilgrim.seatNumber}</span>
-                              <span className="text-[10px] text-amber-400/90 font-sans font-semibold">
-                                (Locked)
-                              </span>
-                            </div>
-                            <span className="text-[9px] text-slate-500 mt-1 flex items-center justify-center gap-1 select-none">
-                              <MousePointerClick className="w-2.5 h-2.5 text-slate-500" />
-                              Triple-click to edit
-                            </span>
+                            {(() => {
+                              const bNum = extractBerthNumber(pilgrim.seatNumber);
+                              const bInfo = bNum ? getIndianRailwaysBerthType(bNum, activeVehicle?.coachType || 'sleeper') : null;
+                              const isSeniorOnUpper = (pilgrim.age || 0) >= 60 && bInfo && !bInfo.isLower;
+
+                              return (
+                                <>
+                                  <div
+                                    onClick={(e) => handleSeatClick(e, pilgrim)}
+                                    className={`cursor-pointer select-none group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono font-bold text-xs border transition-all shadow-xs ${
+                                      bInfo
+                                        ? `${bInfo.bgClass} ${bInfo.borderClass} hover:border-amber-400`
+                                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:border-amber-400 hover:bg-emerald-500/25'
+                                    }`}
+                                    title="🔒 Seat/Berth is locked! Triple-click here to edit"
+                                  >
+                                    <Lock className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                                    <span className="text-white text-xs font-black tracking-wide">{pilgrim.seatNumber}</span>
+                                    {bInfo && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${bInfo.bgClass} ${bInfo.textClass} ${bInfo.borderClass}`}>
+                                        {bInfo.code}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] text-amber-400/90 font-sans font-semibold">
+                                      (Locked)
+                                    </span>
+                                  </div>
+
+                                  {isSeniorOnUpper && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 mt-1">
+                                      ⚠️ Senior on {bInfo?.code || 'Upper'}
+                                    </span>
+                                  )}
+
+                                  {pilgrim.pnrNumber && (
+                                    <span className="text-[9px] text-sky-400 font-mono mt-0.5">
+                                      PNR: {pilgrim.pnrNumber}
+                                    </span>
+                                  )}
+                                  {pilgrim.boardingStation && (
+                                    <span className="text-[9px] text-slate-400 font-sans">
+                                      Stn: {pilgrim.boardingStation}
+                                    </span>
+                                  )}
+
+                                  <span className="text-[9px] text-slate-500 mt-1 flex items-center justify-center gap-1 select-none">
+                                    <MousePointerClick className="w-2.5 h-2.5 text-slate-500" />
+                                    Triple-click to edit
+                                  </span>
+                                </>
+                              );
+                            })()}
                             {lockedHint?.id === pilgrim.id && (
                               <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full mt-1 inline-block animate-bounce">
                                 {lockedHint.message}
@@ -1067,7 +1269,7 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
         </div>
       ) : (
         /* ========================================================================= */
-        /* COACH MAP VIEW: Visual 2x2 Bus Layout                                     */
+        /* COACH MAP VIEW: Visual Layout (Train Coach vs 2x2 Bus)                    */
         /* ========================================================================= */
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Seating Map (8 cols) */}
@@ -1075,159 +1277,369 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 border border-orange-500/20 text-[11px] font-bold">
-                    2x2 Standard Coach
+                  <span className={`px-2 py-0.5 rounded text-[11px] font-bold border ${
+                    isTrainCoach
+                      ? 'bg-sky-500/15 text-sky-300 border-sky-500/30'
+                      : 'bg-orange-500/10 text-orange-400 border-orange-500/20'
+                  }`}>
+                    {isTrainCoach ? '🚆 Indian Railways Coach' : '🚌 2x2 Bus Deluxe'}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">
-                    {activeVehicle?.vehicleNumber || 'Coach Reg: N/A'}
+                    {activeVehicle?.vehicleNumber || (isTrainCoach ? 'LHB Rake' : 'Coach Reg: N/A')}
                   </span>
                 </div>
-                <h3 className="text-lg font-bold text-white mt-1">
+                <h3 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
                   {activeVehicle?.vehicleName}
                 </h3>
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-3 text-[11px]">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3.5 h-3.5 rounded bg-emerald-500/20 border border-emerald-500" />
-                  <span className="text-slate-300">Allocated</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-3.5 h-3.5 rounded bg-slate-950 border border-slate-700 border-dashed" />
-                  <span className="text-slate-400">Available</span>
-                </div>
+              <div className="flex items-center gap-2.5 text-[11px] flex-wrap">
+                {isTrainCoach ? (
+                  <>
+                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                      🟢 LB (Lower)
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                      🟡 MB (Mid)
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                      🔵 UB (Upper)
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold">
+                      🟢 SL (Side Lower)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3.5 h-3.5 rounded bg-emerald-500/20 border border-emerald-500" />
+                      <span className="text-slate-300">Allocated</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3.5 h-3.5 rounded bg-slate-950 border border-slate-700 border-dashed" />
+                      <span className="text-slate-400">Available</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
-            {/* Cockpit */}
-            <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold">
-                  🚪
-                </div>
-                <span>Front Entrance</span>
-              </div>
-              <div className="font-mono text-[11px]">
-                <span>FRONT (WINDSHIELD)</span>
-              </div>
-              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
-                <span>🛞</span>
-                <span className="font-semibold text-slate-300">Driver Cabin</span>
-              </div>
-            </div>
-
-            {/* Seats Grid */}
-            <div className="space-y-3 pt-2">
-              {Array.from(new Set(seatLayoutList.map(s => s.row))).map(rowNum => {
-                const rowSeats = seatLayoutList.filter(s => s.row === rowNum);
-                const leftSeats = rowSeats.filter(s => s.col === 'A' || s.col === 'B');
-                const rightSeats = rowSeats.filter(s => s.col === 'C' || s.col === 'D');
-
-                return (
-                  <div key={rowNum} className="flex items-center justify-between gap-3 sm:gap-6 bg-slate-950/40 p-2 rounded-2xl border border-slate-800/40">
-                    {/* Left Pair */}
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                      {leftSeats.map(seat => {
-                        const occupant = seatOccupantMap.get(seat.id);
-                        const isOccupied = !!occupant;
-
-                        return (
-                          <div
-                            key={seat.id}
-                            onClick={(e) => occupant && handleSeatClick(e, occupant)}
-                            className={`flex-1 min-h-[64px] p-2 rounded-xl text-left border relative flex flex-col justify-between cursor-pointer transition-all ${
-                              isOccupied
-                                ? 'bg-emerald-500/15 border-emerald-500/50 hover:border-amber-400/60'
-                                : 'bg-slate-950 border-slate-800 border-dashed hover:border-orange-500/60'
-                            }`}
-                            title={isOccupied ? `Seat ${seat.id} is occupied by ${occupant.fullName}. Locked (Triple-click to edit)` : `Seat ${seat.id} is vacant.`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className={`font-mono text-xs font-black ${isOccupied ? 'text-white' : 'text-slate-400'}`}>
-                                {seat.id}
-                              </span>
-                              {isOccupied ? (
-                                <Lock className="w-3 h-3 text-amber-400" />
-                              ) : (
-                                <Armchair className="w-3.5 h-3.5 text-slate-600" />
-                              )}
-                            </div>
-                            <div className="mt-1">
-                              {isOccupied ? (
-                                <div>
-                                  <strong className="text-xs text-white block truncate leading-tight">
-                                    {occupant.fullName}
-                                  </strong>
-                                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                    <span>{occupant.gender || '—'}</span>
-                                    {occupant.age && <span>• {occupant.age}y</span>}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-slate-500 font-medium">+ Vacant</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Aisle */}
-                    <div className="w-8 sm:w-12 text-center text-[10px] font-mono text-slate-600 uppercase select-none">
-                      R{rowNum}
-                    </div>
-
-                    {/* Right Pair */}
-                    <div className="flex items-center gap-2 sm:gap-3 flex-1">
-                      {rightSeats.map(seat => {
-                        const occupant = seatOccupantMap.get(seat.id);
-                        const isOccupied = !!occupant;
-
-                        return (
-                          <div
-                            key={seat.id}
-                            onClick={(e) => occupant && handleSeatClick(e, occupant)}
-                            className={`flex-1 min-h-[64px] p-2 rounded-xl text-left border relative flex flex-col justify-between cursor-pointer transition-all ${
-                              isOccupied
-                                ? 'bg-emerald-500/15 border-emerald-500/50 hover:border-amber-400/60'
-                                : 'bg-slate-950 border-slate-800 border-dashed hover:border-orange-500/60'
-                            }`}
-                            title={isOccupied ? `Seat ${seat.id} is occupied by ${occupant.fullName}. Locked (Triple-click to edit)` : `Seat ${seat.id} is vacant.`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className={`font-mono text-xs font-black ${isOccupied ? 'text-white' : 'text-slate-400'}`}>
-                                {seat.id}
-                              </span>
-                              {isOccupied ? (
-                                <Lock className="w-3 h-3 text-amber-400" />
-                              ) : (
-                                <Armchair className="w-3.5 h-3.5 text-slate-600" />
-                              )}
-                            </div>
-                            <div className="mt-1">
-                              {isOccupied ? (
-                                <div>
-                                  <strong className="text-xs text-white block truncate leading-tight">
-                                    {occupant.fullName}
-                                  </strong>
-                                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                    <span>{occupant.gender || '—'}</span>
-                                    {occupant.age && <span>• {occupant.age}y</span>}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-slate-500 font-medium">+ Vacant</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+            {isTrainCoach ? (
+              /* ========================================================================= */
+              /* INDIAN RAILWAYS COMPARTMENTS & BAYS LAYOUT (LHB/ICF Pattern)              */
+              /* ========================================================================= */
+              <div className="space-y-4 pt-1">
+                {/* Train Info Banner */}
+                <div className="bg-slate-950/80 border border-sky-500/20 rounded-2xl p-3 px-4 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Train className="w-4 h-4 text-sky-400 flex-shrink-0" />
+                    <span className="text-slate-300">
+                      Coach Type: <strong className="text-sky-300 uppercase">{activeVehicle?.coachType || 'Sleeper (72 Berths)'}</strong>
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    Total Berths: <strong className="text-white">{activeVehicle?.totalSeats || 72}</strong> • Available: <strong className="text-emerald-400">{vacantSeats.length}</strong>
+                  </span>
+                </div>
+
+                {/* Compartment Bays */}
+                <div className="space-y-3.5">
+                  {Array.from(new Set(seatLayoutList.map(s => s.row))).map(bayNum => {
+                    const baySeats = seatLayoutList.filter(s => s.row === bayNum);
+                    const mainCabinSeats = baySeats.filter(s => s.col !== 'SL' && s.col !== 'SU');
+                    const sideSeats = baySeats.filter(s => s.col === 'SL' || s.col === 'SU');
+
+                    return (
+                      <div key={bayNum} className="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-3.5 shadow-sm space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-slate-800/70 pb-1.5 text-xs">
+                          <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                            <Ticket className="w-3.5 h-3.5 text-sky-400" />
+                            Bay / Compartment {bayNum}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            Berths #{baySeats[0]?.id} - #{baySeats[baySeats.length - 1]?.id}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
+                          {/* Main Cabin (6 Berths) */}
+                          <div className="flex-1 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60">
+                            <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
+                              <span>Main Cabin (Inside)</span>
+                              <span className="text-slate-500 font-mono">{mainCabinSeats.length} Berths</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {mainCabinSeats.map(seat => {
+                                const occupant = getOccupantForSeat(seat.id);
+                                const isOccupied = !!occupant;
+                                const bInfo = seat.berthInfo || getIndianRailwaysBerthType(parseInt(seat.id, 10));
+                                const isSeniorOnUpper = occupant && (occupant.age || 0) >= 60 && !bInfo.isLower;
+
+                                return (
+                                  <div
+                                    key={seat.id}
+                                    onClick={(e) => occupant ? handleSeatClick(e, occupant) : (setAssigningPassenger(unseatedPilgrims[0] || null), setManualModalSeat(seat.id))}
+                                    className={`p-2 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between min-h-[66px] ${
+                                      isOccupied
+                                        ? `${bInfo.bgClass} ${bInfo.borderClass} hover:border-amber-400`
+                                        : 'bg-slate-950 border-slate-800 border-dashed hover:border-sky-500/70'
+                                    }`}
+                                    title={isOccupied ? `Berth ${seat.id} (${bInfo.name}) is occupied by ${occupant.fullName}. Locked (Triple-click to edit)` : `Berth ${seat.id} (${bInfo.name}) is vacant. Click to assign.`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-mono font-black text-xs text-white">
+                                          #{seat.id}
+                                        </span>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${bInfo.bgClass} ${bInfo.textClass} ${bInfo.borderClass}`}>
+                                          {bInfo.code}
+                                        </span>
+                                      </div>
+                                      {isOccupied ? (
+                                        <Lock className="w-3 h-3 text-amber-400" />
+                                      ) : (
+                                        <span className="text-[9px] text-slate-600 font-mono">+ Empty</span>
+                                      )}
+                                    </div>
+
+                                    <div className="mt-1">
+                                      {isOccupied ? (
+                                        <div>
+                                          <strong className="text-xs text-white block truncate leading-tight">
+                                            {occupant.fullName}
+                                          </strong>
+                                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                            <span>{occupant.gender || '—'}</span>
+                                            {occupant.age && <span>• {occupant.age}y</span>}
+                                            {isSeniorOnUpper && (
+                                              <span className="text-[8px] font-bold px-1 rounded bg-amber-500/30 text-amber-200 border border-amber-500/40">
+                                                ⚠️ Senior
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[9px] text-slate-500 font-medium">+ Click to seat</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Gangway / Aisle */}
+                          <div className="hidden sm:flex flex-col items-center justify-center px-2 py-2 bg-slate-950/40 rounded-xl border border-slate-800/40 text-slate-600 font-mono text-[9px] uppercase tracking-widest">
+                            <span className="rotate-90">AISLE</span>
+                          </div>
+
+                          {/* Side Berths (2 Berths: SL & SU) */}
+                          <div className="w-full sm:w-44 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/60 flex flex-col justify-between">
+                            <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
+                              <span>Side Berths</span>
+                              <span className="text-slate-500 font-mono">{sideSeats.length} Berths</span>
+                            </div>
+                            <div className="space-y-2 flex-1 flex flex-col justify-between">
+                              {sideSeats.map(seat => {
+                                const occupant = getOccupantForSeat(seat.id);
+                                const isOccupied = !!occupant;
+                                const bInfo = seat.berthInfo || getIndianRailwaysBerthType(parseInt(seat.id, 10));
+                                const isSeniorOnUpper = occupant && (occupant.age || 0) >= 60 && !bInfo.isLower;
+
+                                return (
+                                  <div
+                                    key={seat.id}
+                                    onClick={(e) => occupant ? handleSeatClick(e, occupant) : (setAssigningPassenger(unseatedPilgrims[0] || null), setManualModalSeat(seat.id))}
+                                    className={`p-2 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between min-h-[66px] ${
+                                      isOccupied
+                                        ? `${bInfo.bgClass} ${bInfo.borderClass} hover:border-amber-400`
+                                        : 'bg-slate-950 border-slate-800 border-dashed hover:border-sky-500/70'
+                                    }`}
+                                    title={isOccupied ? `Side Berth ${seat.id} (${bInfo.name}) is occupied by ${occupant.fullName}. Locked (Triple-click to edit)` : `Side Berth ${seat.id} (${bInfo.name}) is vacant. Click to assign.`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-mono font-black text-xs text-white">
+                                          #{seat.id}
+                                        </span>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${bInfo.bgClass} ${bInfo.textClass} ${bInfo.borderClass}`}>
+                                          {bInfo.code}
+                                        </span>
+                                      </div>
+                                      {isOccupied ? (
+                                        <Lock className="w-3 h-3 text-amber-400" />
+                                      ) : (
+                                        <span className="text-[9px] text-slate-600 font-mono">+ Empty</span>
+                                      )}
+                                    </div>
+
+                                    <div className="mt-1">
+                                      {isOccupied ? (
+                                        <div>
+                                          <strong className="text-xs text-white block truncate leading-tight">
+                                            {occupant.fullName}
+                                          </strong>
+                                          <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                            <span>{occupant.gender || '—'}</span>
+                                            {occupant.age && <span>• {occupant.age}y</span>}
+                                            {isSeniorOnUpper && (
+                                              <span className="text-[8px] font-bold px-1 rounded bg-amber-500/30 text-amber-200 border border-amber-500/40">
+                                                ⚠️ Senior
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-[9px] text-slate-500 font-medium">+ Click to seat</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* ========================================================================= */
+              /* STANDARD BUS COCKPIT & 2x2 SEATS GRID                                     */
+              /* ========================================================================= */
+              <>
+                {/* Cockpit */}
+                <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-4 flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-300 font-bold">
+                      🚪
+                    </div>
+                    <span>Front Entrance</span>
+                  </div>
+                  <div className="font-mono text-[11px]">
+                    <span>FRONT (WINDSHIELD)</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl">
+                    <span>🛞</span>
+                    <span className="font-semibold text-slate-300">Driver Cabin</span>
+                  </div>
+                </div>
+
+                {/* Seats Grid */}
+                <div className="space-y-3 pt-2">
+                  {Array.from(new Set(seatLayoutList.map(s => s.row))).map(rowNum => {
+                    const rowSeats = seatLayoutList.filter(s => s.row === rowNum);
+                    const leftSeats = rowSeats.filter(s => s.col === 'A' || s.col === 'B');
+                    const rightSeats = rowSeats.filter(s => s.col === 'C' || s.col === 'D');
+
+                    return (
+                      <div key={rowNum} className="flex items-center justify-between gap-3 sm:gap-6 bg-slate-950/40 p-2 rounded-2xl border border-slate-800/40">
+                        {/* Left Pair */}
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1">
+                          {leftSeats.map(seat => {
+                            const occupant = getOccupantForSeat(seat.id);
+                            const isOccupied = !!occupant;
+
+                            return (
+                              <div
+                                key={seat.id}
+                                onClick={(e) => occupant && handleSeatClick(e, occupant)}
+                                className={`flex-1 min-h-[64px] p-2 rounded-xl text-left border relative flex flex-col justify-between cursor-pointer transition-all ${
+                                  isOccupied
+                                    ? 'bg-emerald-500/15 border-emerald-500/50 hover:border-amber-400/60'
+                                    : 'bg-slate-950 border-slate-800 border-dashed hover:border-orange-500/60'
+                                }`}
+                                title={isOccupied ? `Seat ${seat.id} is occupied by ${occupant.fullName}. Locked (Triple-click to edit)` : `Seat ${seat.id} is vacant.`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className={`font-mono text-xs font-black ${isOccupied ? 'text-white' : 'text-slate-400'}`}>
+                                    {seat.id}
+                                  </span>
+                                  {isOccupied ? (
+                                    <Lock className="w-3 h-3 text-amber-400" />
+                                  ) : (
+                                    <Armchair className="w-3.5 h-3.5 text-slate-600" />
+                                  )}
+                                </div>
+                                <div className="mt-1">
+                                  {isOccupied ? (
+                                    <div>
+                                      <strong className="text-xs text-white block truncate leading-tight">
+                                        {occupant.fullName}
+                                      </strong>
+                                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                        <span>{occupant.gender || '—'}</span>
+                                        {occupant.age && <span>• {occupant.age}y</span>}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500 font-medium">+ Vacant</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Aisle */}
+                        <div className="w-8 sm:w-12 text-center text-[10px] font-mono text-slate-600 uppercase select-none">
+                          R{rowNum}
+                        </div>
+
+                        {/* Right Pair */}
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1">
+                          {rightSeats.map(seat => {
+                            const occupant = getOccupantForSeat(seat.id);
+                            const isOccupied = !!occupant;
+
+                            return (
+                              <div
+                                key={seat.id}
+                                onClick={(e) => occupant && handleSeatClick(e, occupant)}
+                                className={`flex-1 min-h-[64px] p-2 rounded-xl text-left border relative flex flex-col justify-between cursor-pointer transition-all ${
+                                  isOccupied
+                                    ? 'bg-emerald-500/15 border-emerald-500/50 hover:border-amber-400/60'
+                                    : 'bg-slate-950 border-slate-800 border-dashed hover:border-orange-500/60'
+                                }`}
+                                title={isOccupied ? `Seat ${seat.id} is occupied by ${occupant.fullName}. Locked (Triple-click to edit)` : `Seat ${seat.id} is vacant.`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className={`font-mono text-xs font-black ${isOccupied ? 'text-white' : 'text-slate-400'}`}>
+                                    {seat.id}
+                                  </span>
+                                  {isOccupied ? (
+                                    <Lock className="w-3 h-3 text-amber-400" />
+                                  ) : (
+                                    <Armchair className="w-3.5 h-3.5 text-slate-600" />
+                                  )}
+                                </div>
+                                <div className="mt-1">
+                                  {isOccupied ? (
+                                    <div>
+                                      <strong className="text-xs text-white block truncate leading-tight">
+                                        {occupant.fullName}
+                                      </strong>
+                                      <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                        <span>{occupant.gender || '—'}</span>
+                                        {occupant.age && <span>• {occupant.age}y</span>}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500 font-medium">+ Vacant</span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Unassigned Quick Panel (4 cols) */}
@@ -1339,22 +1751,44 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
               {/* Vacant Seats Grid (Quick Pick) */}
               <div>
                 <p className="text-xs text-slate-400 mb-2 font-medium">
-                  Or pick an available seat on <strong>{activeVehicle?.vehicleName}</strong>:
+                  Or pick an available {isTrainCoach ? 'berth' : 'seat'} on <strong>{activeVehicle?.vehicleName}</strong>:
                 </p>
                 <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
-                  {vacantSeats.map(seat => (
-                    <button
-                      key={seat.id}
-                      type="button"
-                      onClick={() => handleSaveManualSeat(assigningPassenger.id, seat.id)}
-                      className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-orange-500 hover:bg-orange-500/10 text-center transition-all cursor-pointer group"
-                    >
-                      <Armchair className="w-4 h-4 text-slate-500 group-hover:text-orange-400 mx-auto mb-1" />
-                      <span className="font-mono text-xs font-bold text-white group-hover:text-orange-400 block">
-                        {seat.id}
-                      </span>
-                    </button>
-                  ))}
+                  {vacantSeats.map(seat => {
+                    const bInfo = seat.berthInfo;
+                    return (
+                      <button
+                        key={seat.id}
+                        type="button"
+                        onClick={() => handleSaveManualSeat(assigningPassenger.id, seat.id)}
+                        className={`p-2 rounded-xl border text-center transition-all cursor-pointer group ${
+                          bInfo
+                            ? `${bInfo.bgClass} ${bInfo.borderClass} hover:border-amber-400`
+                            : 'bg-slate-950 border-slate-800 hover:border-orange-500 hover:bg-orange-500/10'
+                        }`}
+                      >
+                        {isTrainCoach ? (
+                          <div className="flex flex-col items-center">
+                            <span className="font-mono text-xs font-bold text-white block">
+                              #{seat.id}
+                            </span>
+                            {bInfo && (
+                              <span className={`text-[9px] font-bold mt-0.5 ${bInfo.textClass}`}>
+                                {bInfo.code}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <>
+                            <Armchair className="w-4 h-4 text-slate-500 group-hover:text-orange-400 mx-auto mb-1" />
+                            <span className="font-mono text-xs font-bold text-white group-hover:text-orange-400 block">
+                              {seat.id}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1381,11 +1815,15 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
       {/* ======================================================== */}
       {isNewBusModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-in fade-in zoom-in-95">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
               <h3 className="font-bold text-white text-base flex items-center gap-2">
-                <BusFront className="w-5 h-5 text-orange-400" />
-                Add New Coach / Vehicle
+                {newVehType === 'train' ? (
+                  <Train className="w-5 h-5 text-sky-400" />
+                ) : (
+                  <BusFront className="w-5 h-5 text-orange-400" />
+                )}
+                <span>Add New Coach / Vehicle</span>
               </h3>
               <button
                 onClick={() => setIsNewBusModalOpen(false)}
@@ -1396,37 +1834,136 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
             </div>
 
             <form onSubmit={handleAddNewBus} className="space-y-4 text-xs">
+              {/* Type Switcher */}
+              <div className="bg-slate-950 p-1 rounded-xl border border-slate-800 grid grid-cols-2 gap-1 text-center font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewVehType('train');
+                    setNewCoachType('sleeper');
+                    setNewBusSeats(72);
+                    setNewBusName('Coach S2 (Sleeper - 72 Berths)');
+                  }}
+                  className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    newVehType === 'train'
+                      ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Train className="w-4 h-4 text-sky-400" />
+                  <span>🚆 Train Coach (IRCTC)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewVehType('bus');
+                    setNewBusSeats(40);
+                    setNewBusName('Bus 2 (AC Deluxe)');
+                  }}
+                  className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    newVehType === 'bus'
+                      ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40 shadow-xs'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <BusFront className="w-4 h-4 text-orange-400" />
+                  <span>🚌 Road Bus</span>
+                </button>
+              </div>
+
+              {/* Train Coach Quick Presets */}
+              {newVehType === 'train' && (
+                <div className="space-y-2 bg-slate-950/80 p-3 rounded-xl border border-sky-500/20">
+                  <div className="flex items-center justify-between text-[11px] text-slate-300">
+                    <span className="font-semibold text-sky-400">1-Click Coach Presets:</span>
+                    <span className="text-[10px] text-slate-500">Auto-fills name & berths</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {[
+                      { name: 'Coach S1 (Sleeper)', type: 'sleeper', seats: 72 },
+                      { name: 'Coach S2 (Sleeper)', type: 'sleeper', seats: 72 },
+                      { name: 'Coach S3 (Sleeper)', type: 'sleeper', seats: 72 },
+                      { name: 'Coach B1 (3AC)', type: '3ac', seats: 64 },
+                      { name: 'Coach B2 (3AC)', type: '3ac', seats: 64 },
+                      { name: 'Coach A1 (2AC)', type: '2ac', seats: 48 },
+                    ].map(p => (
+                      <button
+                        key={p.name}
+                        type="button"
+                        onClick={() => {
+                          setNewBusName(`${p.name} - ${p.seats} Berths`);
+                          setNewCoachType(p.type as CoachType);
+                          setNewBusSeats(p.seats);
+                        }}
+                        className="p-1.5 bg-slate-900 hover:bg-sky-500/10 border border-slate-800 hover:border-sky-500/40 rounded-lg text-[10px] font-mono text-slate-300 hover:text-sky-300 transition-all text-center cursor-pointer"
+                      >
+                        + {p.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <div>
+                      <label className="block text-slate-400 text-[10px] font-medium mb-1">Train No.</label>
+                      <input
+                        type="text"
+                        value={newTrainNumber}
+                        onChange={(e) => setNewTrainNumber(e.target.value)}
+                        placeholder="e.g. 12802"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 font-mono text-xs focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 text-[10px] font-medium mb-1">Train Name</label>
+                      <input
+                        type="text"
+                        value={newTrainName}
+                        onChange={(e) => setNewTrainName(e.target.value)}
+                        placeholder="e.g. Purushottam Exp"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Vehicle / Coach Name *</label>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  {newVehType === 'train' ? 'Coach Name (যেমন: Coach S1)' : 'Bus / Vehicle Name *'}
+                </label>
                 <input
                   type="text"
                   required
                   value={newBusName}
                   onChange={(e) => setNewBusName(e.target.value)}
-                  placeholder="e.g. Bus 2 (AC Sleeper)"
+                  placeholder={newVehType === 'train' ? 'e.g. Coach S2 (Sleeper)' : 'e.g. Bus 2 (AC Deluxe)'}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-orange-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Vehicle Plate Number</label>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  {newVehType === 'train' ? 'Rake / Bogie ID (Optional)' : 'Vehicle Plate Number'}
+                </label>
                 <input
                   type="text"
                   value={newBusNumber}
                   onChange={(e) => setNewBusNumber(e.target.value)}
-                  placeholder="e.g. UP-32-AB-5678"
+                  placeholder={newVehType === 'train' ? 'e.g. LHB-2024-ER' : 'e.g. UP-32-AB-5678'}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-orange-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Total Seats *</label>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    {newVehType === 'train' ? 'Total Berths (বার্থ সংখ্যা) *' : 'Total Seats *'}
+                  </label>
                   <input
                     type="number"
                     required
-                    min="10"
-                    max="65"
+                    min="1"
+                    max="120"
                     value={newBusSeats}
                     onChange={(e) => setNewBusSeats(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-orange-500"
@@ -1434,25 +1971,49 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
                 </div>
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Layout</label>
-                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-300 focus:outline-none">
-                    <option value="2x2">2 x 2 Standard</option>
-                  </select>
+                  {newVehType === 'train' ? (
+                    <select
+                      value={newCoachType}
+                      onChange={(e) => {
+                        const ct = e.target.value as CoachType;
+                        setNewCoachType(ct);
+                        if (ct === 'sleeper') setNewBusSeats(72);
+                        if (ct === '3ac') setNewBusSeats(64);
+                        if (ct === '2ac') setNewBusSeats(48);
+                        if (ct === 'cc') setNewBusSeats(73);
+                      }}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none"
+                    >
+                      <option value="sleeper">Sleeper (8 Berths/Bay - 72 Total)</option>
+                      <option value="3ac">AC 3-Tier (8 Berths/Bay - 64 Total)</option>
+                      <option value="2ac">AC 2-Tier (6 Berths/Bay - 48 Total)</option>
+                      <option value="cc">Chair Car (3x2 Layout - 73 Seats)</option>
+                    </select>
+                  ) : (
+                    <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-300 focus:outline-none">
+                      <option value="2x2">2 x 2 Standard</option>
+                    </select>
+                  )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Driver / Captain Name</label>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    {newVehType === 'train' ? 'Coach In-Charge / Leader' : 'Driver / Captain Name'}
+                  </label>
                   <input
                     type="text"
                     value={newDriverName}
                     onChange={(e) => setNewDriverName(e.target.value)}
-                    placeholder="e.g. Ram Sevak"
+                    placeholder={newVehType === 'train' ? 'e.g. HG Govinda Das' : 'e.g. Ram Sevak'}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-orange-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Driver Phone</label>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    {newVehType === 'train' ? 'In-Charge Phone' : 'Driver Phone'}
+                  </label>
                   <input
                     type="text"
                     value={newDriverPhone}
@@ -1467,15 +2028,15 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsNewBusModalOpen(false)}
-                  className="w-1/2 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:bg-slate-800"
+                  className="w-1/2 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:bg-slate-800 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 cursor-pointer"
+                  className="w-1/2 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 cursor-pointer"
                 >
-                  Add Vehicle
+                  {newVehType === 'train' ? 'Add Coach' : 'Add Vehicle'}
                 </button>
               </div>
             </form>

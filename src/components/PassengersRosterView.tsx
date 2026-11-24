@@ -93,6 +93,9 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
   const [editPaymentMethod, setEditPaymentMethod] = useState<'Cash' | 'UPI' | 'Bank Transfer'>('UPI');
   const [editSeatNumber, setEditSeatNumber] = useState('');
   const [editSeatType, setEditSeatType] = useState<SeatType>('None');
+  const [editPnrNumber, setEditPnrNumber] = useState('');
+  const [editBerthPreference, setEditBerthPreference] = useState('');
+  const [editBoardingStation, setEditBoardingStation] = useState('');
   const [editBoarded, setEditBoarded] = useState(false);
   const [editNotes, setEditNotes] = useState('');
   const [editStatus, setEditStatus] = useState<'paid' | 'partial' | 'unpaid' | 'refunded'>('unpaid');
@@ -151,6 +154,9 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     setEditPaymentMethod(reg.paymentMethod || 'UPI');
     setEditSeatNumber(reg.seatNumber || '');
     setEditSeatType(reg.seatType || 'None');
+    setEditPnrNumber(reg.pnrNumber || '');
+    setEditBerthPreference(reg.berthPreference || '');
+    setEditBoardingStation(reg.boardingStation || '');
     setEditBoarded(reg.boarded || false);
     setEditNotes(reg.notes || '');
     setEditStatus(reg.status);
@@ -233,6 +239,9 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
       paymentMethod: editPaymentMethod,
       seatNumber: editSeatNumber.trim() ? editSeatNumber.trim().toUpperCase() : undefined,
       seatType: editSeatType,
+      pnrNumber: editPnrNumber.trim() || undefined,
+      berthPreference: editBerthPreference.trim() || undefined,
+      boardingStation: editBoardingStation.trim() || undefined,
       boarded: editBoarded,
       notes: editNotes.trim(),
       status,
@@ -704,6 +713,26 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                             {reg.seatType}
                           </span>
                         )}
+                        {reg.seatNumber && (
+                          <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded font-mono font-bold text-[10px]">
+                            Seat/Berth: {reg.seatNumber}
+                          </span>
+                        )}
+                        {reg.pnrNumber && (
+                          <span className="bg-sky-500/15 text-sky-300 border border-sky-500/30 px-1.5 py-0.2 rounded font-mono font-bold text-[10px]">
+                            🚆 PNR: {reg.pnrNumber}
+                          </span>
+                        )}
+                        {reg.berthPreference && (
+                          <span className="text-slate-400 text-[10px]">
+                            • {reg.berthPreference}
+                          </span>
+                        )}
+                        {reg.boardingStation && (
+                          <span className="text-slate-400 text-[10px]">
+                            • Stn: {reg.boardingStation}
+                          </span>
+                        )}
                         {reg.bloodGroup && (
                           <span className="bg-rose-500/15 text-rose-300 border border-rose-500/30 px-1.5 py-0.2 rounded font-semibold text-[10px]">
                             🩸 {reg.bloodGroup}
@@ -1098,6 +1127,36 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Train PNR #</label>
+                    <input
+                      type="text"
+                      value={editPnrNumber}
+                      onChange={(e) => setEditPnrNumber(e.target.value)}
+                      placeholder="e.g. 642-1234567"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3 py-2 text-white font-mono uppercase focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Berth Preference</label>
+                    <input
+                      type="text"
+                      value={editBerthPreference}
+                      onChange={(e) => setEditBerthPreference(e.target.value)}
+                      placeholder="e.g. Lower Berth (LB)"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">Boarding Station</label>
+                    <input
+                      type="text"
+                      value={editBoardingStation}
+                      onChange={(e) => setEditBoardingStation(e.target.value)}
+                      placeholder="e.g. Durgapur (DGR)"
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-sky-500 rounded-xl px-3 py-2 text-white focus:outline-none"
+                    />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer select-none mt-5">

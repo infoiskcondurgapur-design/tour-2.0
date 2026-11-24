@@ -75,6 +75,28 @@ export function clearCustomSupabaseCredentials() {
 // =========================================================================
 
 export function tourToDb(t: Tour) {
+  let combinedNotes = t.notes || '';
+  if (t.transportType) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[Transport:\s*[^\]]+\]/gi, '').replace(/\[Transport:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [Transport: ${t.transportType}]` : `[Transport: ${t.transportType}]`;
+  }
+  if (t.trainNumber) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[TrainNo:\s*[^\]]+\]/gi, '').replace(/\[TrainNo:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [TrainNo: ${t.trainNumber}]` : `[TrainNo: ${t.trainNumber}]`;
+  }
+  if (t.trainName) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[TrainName:\s*[^\]]+\]/gi, '').replace(/\[TrainName:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [TrainName: ${t.trainName}]` : `[TrainName: ${t.trainName}]`;
+  }
+  if (t.boardingStation) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[BoardingStn:\s*[^\]]+\]/gi, '').replace(/\[BoardingStn:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [BoardingStn: ${t.boardingStation}]` : `[BoardingStn: ${t.boardingStation}]`;
+  }
+  if (t.destinationStation) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[DestStn:\s*[^\]]+\]/gi, '').replace(/\[DestStn:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [DestStn: ${t.destinationStation}]` : `[DestStn: ${t.destinationStation}]`;
+  }
+
   return {
     id: t.id,
     name: t.name,
@@ -85,12 +107,42 @@ export function tourToDb(t: Tour) {
     default_fee: t.defaultFee,
     budget: t.budget,
     status: t.status,
-    notes: t.notes || null,
+    notes: combinedNotes || null,
     updated_at: new Date().toISOString(),
   };
 }
 
 export function tourFromDb(r: any): Tour {
+  let transportType = r.transport_type || undefined;
+  if (!transportType && r.notes) {
+    const match = r.notes.match(/\[Transport:\s*([^\]]+)\]/i);
+    if (match && match[1]) transportType = match[1].trim();
+  }
+
+  let trainNumber = r.train_number || undefined;
+  if (!trainNumber && r.notes) {
+    const match = r.notes.match(/\[TrainNo:\s*([^\]]+)\]/i);
+    if (match && match[1]) trainNumber = match[1].trim();
+  }
+
+  let trainName = r.train_name || undefined;
+  if (!trainName && r.notes) {
+    const match = r.notes.match(/\[TrainName:\s*([^\]]+)\]/i);
+    if (match && match[1]) trainName = match[1].trim();
+  }
+
+  let boardingStation = r.boarding_station || undefined;
+  if (!boardingStation && r.notes) {
+    const match = r.notes.match(/\[BoardingStn:\s*([^\]]+)\]/i);
+    if (match && match[1]) boardingStation = match[1].trim();
+  }
+
+  let destinationStation = r.destination_station || undefined;
+  if (!destinationStation && r.notes) {
+    const match = r.notes.match(/\[DestStn:\s*([^\]]+)\]/i);
+    if (match && match[1]) destinationStation = match[1].trim();
+  }
+
   return {
     id: r.id,
     name: r.name,
@@ -101,6 +153,11 @@ export function tourFromDb(r: any): Tour {
     defaultFee: Number(r.default_fee || 0),
     budget: Number(r.budget || 0),
     status: r.status,
+    transportType,
+    trainNumber,
+    trainName,
+    boardingStation,
+    destinationStation,
     notes: r.notes || undefined,
   };
 }
@@ -121,6 +178,18 @@ export function regToDb(p: PassengerRegistration) {
   if (p.bloodGroup) {
     combinedNotes = combinedNotes.replace(/\|\s*\[Blood:\s*[^\]]+\]/gi, '').replace(/\[Blood:\s*[^\]]+\]/gi, '').trim();
     combinedNotes = combinedNotes ? `${combinedNotes} | [Blood: ${p.bloodGroup}]` : `[Blood: ${p.bloodGroup}]`;
+  }
+  if (p.pnrNumber) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[PNR:\s*[^\]]+\]/gi, '').replace(/\[PNR:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [PNR: ${p.pnrNumber}]` : `[PNR: ${p.pnrNumber}]`;
+  }
+  if (p.berthPreference) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[Berth:\s*[^\]]+\]/gi, '').replace(/\[Berth:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [Berth: ${p.berthPreference}]` : `[Berth: ${p.berthPreference}]`;
+  }
+  if (p.boardingStation) {
+    combinedNotes = combinedNotes.replace(/\|\s*\[Station:\s*[^\]]+\]/gi, '').replace(/\[Station:\s*[^\]]+\]/gi, '').trim();
+    combinedNotes = combinedNotes ? `${combinedNotes} | [Station: ${p.boardingStation}]` : `[Station: ${p.boardingStation}]`;
   }
 
   return {
@@ -193,6 +262,27 @@ export function regFromDb(r: any): PassengerRegistration {
     if (match && match[1]) bloodGroup = match[1].trim();
   }
 
+  // Extract pnrNumber
+  let pnrNumber = r.pnr_number || undefined;
+  if (!pnrNumber && r.notes) {
+    const match = r.notes.match(/\[PNR:\s*([^\]]+)\]/i);
+    if (match && match[1]) pnrNumber = match[1].trim();
+  }
+
+  // Extract berthPreference
+  let berthPreference = r.berth_preference || undefined;
+  if (!berthPreference && r.notes) {
+    const match = r.notes.match(/\[Berth:\s*([^\]]+)\]/i);
+    if (match && match[1]) berthPreference = match[1].trim();
+  }
+
+  // Extract boardingStation
+  let boardingStation = r.boarding_station || undefined;
+  if (!boardingStation && r.notes) {
+    const match = r.notes.match(/\[Station:\s*([^\]]+)\]/i);
+    if (match && match[1]) boardingStation = match[1].trim();
+  }
+
   return {
     id: r.id,
     registrationNumber: r.registration_number,
@@ -220,6 +310,9 @@ export function regFromDb(r: any): PassengerRegistration {
     seatNumber: r.seat_number || undefined,
     seatType,
     vehicleName: r.vehicle_name || undefined,
+    pnrNumber,
+    berthPreference,
+    boardingStation,
     boarded,
     notes: r.notes || undefined,
     status: r.status || 'unpaid',

@@ -14,9 +14,11 @@ import {
   AlertCircle,
   Users,
   Armchair,
-  Wallet
+  Wallet,
+  Train
 } from 'lucide-react';
 import { PassengerRegistration, Tour } from '../types';
+import { getIndianRailwaysBerthType, extractBerthNumber } from '../utils/railway';
 
 interface BroadcastKitModalProps {
   isOpen: boolean;
@@ -33,16 +35,33 @@ export const BroadcastKitModal: React.FC<BroadcastKitModalProps> = ({
   tour,
   registrations,
 }) => {
-  const [activeTab, setActiveTab] = useState<'departure' | 'seats' | 'dues' | 'packing'>('departure');
+  const isTrainTour = useMemo(() => {
+    return tour?.transportType === 'train' || 
+      tour?.transportType === 'mixed' || 
+      Boolean(tour?.trainNumber) || 
+      tourName.toLowerCase().includes('train');
+  }, [tour, tourName]);
+
+  const [activeTab, setActiveTab] = useState<'train' | 'departure' | 'seats' | 'dues' | 'packing'>(() => {
+    return (tour?.transportType === 'train' || Boolean(tour?.trainNumber)) ? 'train' : 'departure';
+  });
   const [copied, setCopied] = useState(false);
 
-  // Customizer fields
+  // Customizer fields - Bus & General
   const [reportingPlace, setReportingPlace] = useState('ISKCON Durgapur Temple Complex, City Centre');
   const [reportingTime, setReportingTime] = useState('05:30 AM');
   const [departureTime, setDepartureTime] = useState('06:00 AM');
   const [busNumber, setBusNumber] = useState('WB-02-YATRA-01 (AC Deluxe)');
   const [coordinatorPhone, setCoordinatorPhone] = useState('+91 98311 22334 / +91 94344 55667');
   const [upiId, setUpiId] = useState('iskcon.yatra@upi');
+
+  // Customizer fields - Train Yatra
+  const [trainNumber, setTrainNumber] = useState(tour?.trainNumber || '12802');
+  const [trainName, setTrainName] = useState(tour?.trainName || 'Purushottam Express');
+  const [trainBoardingStation, setTrainBoardingStation] = useState(tour?.boardingStation || 'Durgapur Railway Station (DGR)');
+  const [platformMeetingPoint, setPlatformMeetingPoint] = useState('Durgapur Station Platform 2 (Main Waiting Hall)');
+  const [stationReportingTime, setStationReportingTime] = useState('09:30 PM');
+  const [trainDepartureTime, setTrainDepartureTime] = useState('10:15 PM');
 
   // Filter registrations for this tour
   const tourRegistrations = useMemo(() => {
@@ -65,6 +84,42 @@ export const BroadcastKitModal: React.FC<BroadcastKitModalProps> = ({
 
   // Generate Message Content based on tab
   const messageText = useMemo(() => {
+    if (activeTab === 'train') {
+      const sortedSeats = [...tourRegistrations].sort((a, b) => {
+        const sa = extractBerthNumber(a.seatNumber) || 999;
+        const sb = extractBerthNumber(b.seatNumber) || 999;
+        return sa - sb;
+      });
+
+      const berthListText = sortedSeats.map((p, i) => {
+        const bNum = extractBerthNumber(p.seatNumber);
+        const bInfo = bNum ? getIndianRailwaysBerthType(bNum) : null;
+        const berthStr = p.seatNumber ? `*Berth ${p.seatNumber}${bInfo ? ` (${bInfo.code})` : ''}*` : '_Berth Pending_';
+        const coachStr = p.vehicleName ? `[${p.vehicleName}] ` : '';
+        const pnrStr = p.pnrNumber ? ` (PNR: ${p.pnrNumber})` : '';
+        return `${i + 1}. ${coachStr}${berthStr}: ${p.fullName}${pnrStr}`;
+      }).join('\n');
+
+      return `🙏 *Hare Krishna! ISKCON Durgapur Railway Yatra Notice* 🙏\n\n` +
+        `🚩 *Tour / Dham:* ${tourName} (${tour?.destination || 'Holy Dham'})\n` +
+        `📅 *Dates:* ${tour?.startDate || 'Upcoming'} to ${tour?.endDate || 'End'}\n\n` +
+        `🚆 *Train:* ${trainNumber} - ${trainName}\n` +
+        `🚉 *Boarding Station:* ${trainBoardingStation}\n` +
+        `📍 *Station Meeting Point:* ${platformMeetingPoint}\n` +
+        `⏰ *Station Reporting Time:* ${stationReportingTime} (Please be on time)\n` +
+        `🕒 *Scheduled Departure Time:* ${trainDepartureTime}\n\n` +
+        `👥 *Total Devotees:* ${tourRegistrations.length}\n\n` +
+        `📋 *Official Coach & Berth Allotment Chart:*\n` +
+        `${berthListText || '_No berths allocated yet._'}\n\n` +
+        `⚠️ *Railway Yatra Instructions:*\n` +
+        `• Original Govt Photo ID (Aadhaar / Voter ID) is *MANDATORY* for TTE verification.\n` +
+        `• Keep luggage locked and chained during train travel.\n` +
+        `• Senior citizens and mothers are prioritized for Lower Berths.\n` +
+        `• Warm bedding and prasadam will be coordinated as per schedule.\n\n` +
+        `📞 *Coordinators Helpline:*\n${coordinatorPhone}\n\n` +
+        `_Jay Jagannath! Hare Krishna! Have a blissful train journey!_`;
+    }
+
     if (activeTab === 'departure') {
       return `🙏 *Hare Krishna! ISKCON Durgapur Yatra Notice* 🙏\n\n` +
         `🚩 *Tour:* ${tourName} (${tour?.destination || 'Holy Dham'})\n` +
@@ -148,7 +203,13 @@ export const BroadcastKitModal: React.FC<BroadcastKitModalProps> = ({
     coordinatorPhone, 
     upiId, 
     tourRegistrations, 
-    duePilgrims
+    duePilgrims,
+    trainNumber,
+    trainName,
+    trainBoardingStation,
+    platformMeetingPoint,
+    stationReportingTime,
+    trainDepartureTime,
   ]);
 
   const handleCopy = () => {
@@ -198,32 +259,44 @@ export const BroadcastKitModal: React.FC<BroadcastKitModalProps> = ({
         {/* Template Selector Tabs */}
         <div className="px-6 py-3 border-b border-slate-800 bg-slate-900/60 flex flex-wrap gap-2 flex-shrink-0 text-xs">
           <button
+            onClick={() => setActiveTab('train')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+              activeTab === 'train'
+                ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
+            }`}
+          >
+            <Train className="w-3.5 h-3.5 text-sky-400" />
+            <span>🚆 Train Yatra & Berth Chart</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('departure')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
               activeTab === 'departure'
                 ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Departure & Reporting</span>
+            <span>Bus Departure & Reporting</span>
           </button>
 
           <button
             onClick={() => setActiveTab('seats')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
               activeTab === 'seats'
                 ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
             }`}
           >
             <Armchair className="w-3.5 h-3.5" />
-            <span>Seat Allotment Chart</span>
+            <span>Bus Seat Allotment</span>
           </button>
 
           <button
             onClick={() => setActiveTab('dues')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
               activeTab === 'dues'
                 ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
@@ -235,7 +308,7 @@ export const BroadcastKitModal: React.FC<BroadcastKitModalProps> = ({
 
           <button
             onClick={() => setActiveTab('packing')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
               activeTab === 'packing'
                 ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
                 : 'bg-slate-950/60 text-slate-400 hover:text-white border border-slate-800'
@@ -255,78 +328,161 @@ export const BroadcastKitModal: React.FC<BroadcastKitModalProps> = ({
               Customize Announcement Details
             </h3>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Reporting Location
-              </label>
-              <input
-                type="text"
-                value={reportingPlace}
-                onChange={(e) => setReportingPlace(e.target.value)}
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
-              />
-            </div>
+            {activeTab === 'train' ? (
+              <div className="space-y-3 bg-slate-900/60 p-3 rounded-2xl border border-sky-500/20">
+                <div className="text-[11px] font-bold text-sky-400 flex items-center gap-1.5 pb-1 border-b border-slate-800">
+                  <Train className="w-4 h-4 text-sky-400" />
+                  <span>Railway Journey Details:</span>
+                </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Reporting Time
-                </label>
-                <input
-                  type="text"
-                  value={reportingTime}
-                  onChange={(e) => setReportingTime(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-400 mb-1">Train Number</label>
+                    <input
+                      type="text"
+                      value={trainNumber}
+                      onChange={(e) => setTrainNumber(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500 font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-400 mb-1">Train Name</label>
+                    <input
+                      type="text"
+                      value={trainName}
+                      onChange={(e) => setTrainName(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">Boarding Station (ছাড়ার স্টেশন)</label>
+                  <input
+                    type="text"
+                    value={trainBoardingStation}
+                    onChange={(e) => setTrainBoardingStation(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">Station Meeting Point / Platform</label>
+                  <input
+                    type="text"
+                    value={platformMeetingPoint}
+                    onChange={(e) => setPlatformMeetingPoint(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-400 mb-1">Station Reporting Time</label>
+                    <input
+                      type="text"
+                      value={stationReportingTime}
+                      onChange={(e) => setStationReportingTime(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-slate-400 mb-1">Scheduled Departure</label>
+                    <input
+                      type="text"
+                      value={trainDepartureTime}
+                      onChange={(e) => setTrainDepartureTime(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-400 mb-1">Coordinator Contacts</label>
+                  <input
+                    type="text"
+                    value={coordinatorPhone}
+                    onChange={(e) => setCoordinatorPhone(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-sky-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Departure Time
-                </label>
-                <input
-                  type="text"
-                  value={departureTime}
-                  onChange={(e) => setDepartureTime(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
-                />
-              </div>
-            </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Reporting Location
+                  </label>
+                  <input
+                    type="text"
+                    value={reportingPlace}
+                    onChange={(e) => setReportingPlace(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Bus / Coach Details
-              </label>
-              <input
-                type="text"
-                value={busNumber}
-                onChange={(e) => setBusNumber(e.target.value)}
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
-              />
-            </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Reporting Time
+                    </label>
+                    <input
+                      type="text"
+                      value={reportingTime}
+                      onChange={(e) => setReportingTime(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">
+                      Departure Time
+                    </label>
+                    <input
+                      type="text"
+                      value={departureTime}
+                      onChange={(e) => setDepartureTime(e.target.value)}
+                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Coordinator Contacts
-              </label>
-              <input
-                type="text"
-                value={coordinatorPhone}
-                onChange={(e) => setCoordinatorPhone(e.target.value)}
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Bus / Coach Details
+                  </label>
+                  <input
+                    type="text"
+                    value={busNumber}
+                    onChange={(e) => setBusNumber(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                  />
+                </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                UPI Payment ID
-              </label>
-              <input
-                type="text"
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500 font-mono"
-              />
-            </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Coordinator Contacts
+                  </label>
+                  <input
+                    type="text"
+                    value={coordinatorPhone}
+                    onChange={(e) => setCoordinatorPhone(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    UPI Payment ID
+                  </label>
+                  <input
+                    type="text"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-hidden focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right Column: Live Formatted WhatsApp Message Preview */}

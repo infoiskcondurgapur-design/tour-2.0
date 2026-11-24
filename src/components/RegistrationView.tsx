@@ -13,10 +13,12 @@ import {
   MapPin,
   Clock,
   AlertTriangle,
-  Crown
+  Crown,
+  Train
 } from 'lucide-react';
-import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS } from '../types';
+import { PassengerRegistration, Tour, SeatType, SEAT_TYPE_OPTIONS, BERTH_PREFERENCE_OPTIONS, BerthPreference } from '../types';
 import { DuplicateEntryModal } from './DuplicateEntryModal';
+import { COMMON_BOARDING_STATIONS } from '../utils/railway';
 
 interface RegistrationViewProps {
   registrations: PassengerRegistration[];
@@ -51,6 +53,9 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
   const [age, setAge] = useState<number | ''>(45);
   const [seatNumber, setSeatNumber] = useState('');
   const [seatType, setSeatType] = useState<SeatType>('Sleeper Class (SL)');
+  const [pnrNumber, setPnrNumber] = useState('');
+  const [berthPreference, setBerthPreference] = useState<BerthPreference | string>('No Preference');
+  const [boardingStation, setBoardingStation] = useState(tours[0]?.boardingStation || 'Durgapur (DGR)');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
@@ -156,9 +161,11 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       setLeaderName('');
       setAddress('');
       setSeatType('Sleeper Class (SL)');
+      setPnrNumber('');
+      setBerthPreference('No Preference');
       setSuccessNotice(`Registration #${reg.registrationNumber} created successfully! Earning and Due accounts updated.`);
     } else {
-      setSuccessNotice(`Registration #${reg.registrationNumber} recorded! Leader "${reg.leaderName || 'group'}" and Tour settings kept for next devotee.`);
+      setSuccessNotice(`Registration #${reg.registrationNumber} recorded! Leader "${reg.leaderName || 'group'}", PNR, and Tour settings kept for next family member.`);
     }
 
     setTimeout(() => setSuccessNotice(null), 5000);
@@ -186,6 +193,9 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
       age: age ? Number(age) : undefined,
       seatNumber: seatNumber.trim() ? seatNumber.trim().toUpperCase() : undefined,
       seatType: seatType || 'None',
+      pnrNumber: pnrNumber.trim() || undefined,
+      berthPreference: berthPreference !== 'No Preference' ? berthPreference : undefined,
+      boardingStation: boardingStation.trim() || undefined,
       phoneNumber: phoneNumber.trim(),
       whatsappNumber: (whatsappNumber || phoneNumber).trim(),
       emergencyPhone: emergencyPhone.trim() || undefined,
@@ -334,6 +344,13 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                   <Wallet className="w-3.5 h-3.5 text-emerald-400" />
                   Standard Fee: <strong className="text-emerald-400">{formatINR(selectedTourObj.defaultFee)}</strong>
                 </span>
+                {(selectedTourObj.transportType === 'train' || selectedTourObj.transportType === 'mixed' || selectedTourObj.trainNumber || selectedTourObj.trainName) && (
+                  <span className="flex items-center gap-1.5 text-sky-400">
+                    <Train className="w-3.5 h-3.5 text-sky-400" />
+                    Train: <strong className="text-sky-300">{selectedTourObj.trainNumber ? `${selectedTourObj.trainNumber} - ` : ''}{selectedTourObj.trainName || 'Train Yatra'}</strong>
+                    {selectedTourObj.boardingStation && <span className="text-slate-400 font-normal">({selectedTourObj.boardingStation})</span>}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -519,6 +536,62 @@ export const RegistrationView: React.FC<RegistrationViewProps> = ({
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* Railway specific fields: PNR, Berth Preference, Boarding Station */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Train className="w-3 h-3 text-sky-400" />
+                    <span>Train PNR #</span>
+                  </span>
+                  <span className="text-[10px] text-sky-400 font-normal">Optional</span>
+                </label>
+                <input
+                  type="text"
+                  value={pnrNumber}
+                  onChange={(e) => setPnrNumber(e.target.value)}
+                  placeholder="e.g. 642-1234567"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500 font-mono uppercase"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Berth Preference (বার্থ পছন্দ)</span>
+                  <span className="text-[10px] text-emerald-400 font-normal">Senior Priority</span>
+                </label>
+                <select
+                  value={berthPreference}
+                  onChange={(e) => setBerthPreference(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500 font-medium cursor-pointer"
+                >
+                  {BERTH_PREFERENCE_OPTIONS.map((bp) => (
+                    <option key={bp} value={bp} className="bg-slate-900 text-slate-100">
+                      {bp}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Boarding Station (ছাড়ার স্টেশন)</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                </label>
+                <input
+                  type="text"
+                  value={boardingStation}
+                  onChange={(e) => setBoardingStation(e.target.value)}
+                  placeholder="e.g. Durgapur (DGR)"
+                  list="reg-boarding-stn-list"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-slate-200 text-sm focus:outline-none focus:border-sky-500"
+                />
+                <datalist id="reg-boarding-stn-list">
+                  {COMMON_BOARDING_STATIONS.map((st) => (
+                    <option key={st} value={st} />
+                  ))}
+                </datalist>
               </div>
 
               <div className="sm:col-span-2">

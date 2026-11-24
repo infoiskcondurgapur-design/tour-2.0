@@ -18,9 +18,13 @@ import {
   Copy,
   Check,
   Globe,
-  ExternalLink
+  ExternalLink,
+  Train,
+  BusFront,
+  Ticket
 } from 'lucide-react';
-import { Tour, TourStatus, FinancialTransaction, PassengerRegistration } from '../types';
+import { Tour, TourStatus, TransportType, FinancialTransaction, PassengerRegistration } from '../types';
+import { POPULAR_YATRA_TRAINS, COMMON_BOARDING_STATIONS } from '../utils/railway';
 
 interface ToursViewProps {
   tours: Tour[];
@@ -58,7 +62,11 @@ export const ToursView: React.FC<ToursViewProps> = ({
 
   const getTourWhatsAppShareUrl = (tour: Tour) => {
     const link = getSelfRegLink(tour.name);
-    const text = `🙏 *Hare Krishna!* Registration is now open for *${tour.name}* (${tour.destination}) from ${tour.startDate} to ${tour.endDate}.\n\n💰 *Tour Fee:* ${formatINR(tour.defaultFee)}\n🔗 *Register Online:* ${link}\n\nReserve your seat today!`;
+    let trainDetails = '';
+    if (tour.transportType === 'train' || tour.transportType === 'mixed' || tour.trainNumber || tour.trainName) {
+      trainDetails = `\n🚆 *Train:* ${tour.trainNumber ? `${tour.trainNumber} - ` : ''}${tour.trainName || 'Special Yatra Express'}\n🚉 *Boarding:* ${tour.boardingStation || 'Durgapur (DGR)'}`;
+    }
+    const text = `🙏 *Hare Krishna!* Registration is now open for *${tour.name}* (${tour.destination}) from ${tour.startDate} to ${tour.endDate}.${trainDetails}\n\n💰 *Tour Fee:* ${formatINR(tour.defaultFee)}\n🔗 *Register Online:* ${link}\n\nReserve your berth / seat today!`;
     return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
   };
 
@@ -71,6 +79,11 @@ export const ToursView: React.FC<ToursViewProps> = ({
   const [defaultFee, setDefaultFee] = useState<number | ''>(5000);
   const [budget, setBudget] = useState<number | ''>(200000);
   const [status, setStatus] = useState<TourStatus>('registration_open');
+  const [transportType, setTransportType] = useState<TransportType>('train');
+  const [trainNumber, setTrainNumber] = useState('12802');
+  const [trainName, setTrainName] = useState('Purushottam Express');
+  const [boardingStation, setBoardingStation] = useState('Durgapur (DGR)');
+  const [destinationStation, setDestinationStation] = useState('Puri (PURI)');
   const [notes, setNotes] = useState('');
 
   const formatINR = (val: number) => {
@@ -98,6 +111,11 @@ export const ToursView: React.FC<ToursViewProps> = ({
       defaultFee: Number(defaultFee || 0),
       budget: Number(budget || 0),
       status,
+      transportType,
+      trainNumber: transportType === 'train' || transportType === 'mixed' ? trainNumber.trim() : undefined,
+      trainName: transportType === 'train' || transportType === 'mixed' ? trainName.trim() : undefined,
+      boardingStation: transportType === 'train' || transportType === 'mixed' ? boardingStation.trim() : undefined,
+      destinationStation: transportType === 'train' || transportType === 'mixed' ? destinationStation.trim() : undefined,
       notes: notes.trim(),
     };
 
@@ -112,6 +130,11 @@ export const ToursView: React.FC<ToursViewProps> = ({
     setDefaultFee(5000);
     setBudget(200000);
     setStatus('registration_open');
+    setTransportType('train');
+    setTrainNumber('');
+    setTrainName('');
+    setBoardingStation('');
+    setDestinationStation('');
     setNotes('');
     setIsModalOpen(false);
   };
@@ -222,6 +245,23 @@ export const ToursView: React.FC<ToursViewProps> = ({
                     <h3 className="text-lg font-bold text-white tracking-tight">
                       {tour.name}
                     </h3>
+                    {(tour.transportType === 'train' || tour.transportType === 'mixed' || tour.trainNumber || tour.trainName) && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-sky-300 bg-sky-500/10 border border-sky-500/25 px-2.5 py-0.5 rounded-lg w-fit">
+                        <Train className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                        <span className="font-medium font-mono">
+                          {tour.trainNumber ? `${tour.trainNumber} - ` : ''}{tour.trainName || 'Train Yatra'}
+                        </span>
+                        {tour.boardingStation && (
+                          <span className="text-slate-400 font-sans">• {tour.boardingStation}</span>
+                        )}
+                      </div>
+                    )}
+                    {tour.transportType === 'bus' && (
+                      <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-orange-300 bg-orange-500/10 border border-orange-500/25 px-2.5 py-0.5 rounded-lg w-fit">
+                        <BusFront className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                        <span className="font-medium">Bus Yatra</span>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -443,6 +483,132 @@ export const ToursView: React.FC<ToursViewProps> = ({
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 font-mono text-slate-200 focus:outline-none focus:border-orange-500"
                   />
                 </div>
+              </div>
+
+              {/* Transport Mode Selection */}
+              <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+                <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Train className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Transport Mode (যাত্রা মাধ্যম)</span>
+                  </span>
+                  <span className="text-[10px] text-sky-400 font-normal">Train / Bus / Mixed</span>
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTransportType('train')}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      transportType === 'train'
+                        ? 'bg-sky-500/20 border-sky-500 text-sky-300 shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Train className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Train Yatra</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransportType('bus')}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      transportType === 'bus'
+                        ? 'bg-orange-500/20 border-orange-500 text-orange-300 shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <BusFront className="w-3.5 h-3.5 text-orange-400" />
+                    <span>Bus Yatra</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTransportType('mixed')}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      transportType === 'mixed'
+                        ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow-sm'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span>🚆+🚌 Train & Bus</span>
+                  </button>
+                </div>
+
+                {/* Train Details if Train or Mixed is active */}
+                {(transportType === 'train' || transportType === 'mixed') && (
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-3">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span className="font-semibold text-sky-400">Indian Railways Info (ট্রেনের বিবরণ)</span>
+                      <span className="text-[10px]">Popular Yatra Trains</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {POPULAR_YATRA_TRAINS.slice(0, 6).map(t => (
+                        <button
+                          key={t.no}
+                          type="button"
+                          onClick={() => {
+                            setTrainNumber(t.no);
+                            setTrainName(t.name);
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-sky-500/50 text-[10px] font-mono text-slate-300 hover:text-sky-300 transition-all cursor-pointer"
+                        >
+                          {t.no} {t.name}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-slate-400 text-[10px] font-medium mb-1">Train No.</label>
+                        <input
+                          type="text"
+                          value={trainNumber}
+                          onChange={(e) => setTrainNumber(e.target.value)}
+                          placeholder="e.g. 12802"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 font-mono text-xs focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-[10px] font-medium mb-1">Train Name</label>
+                        <input
+                          type="text"
+                          value={trainName}
+                          onChange={(e) => setTrainName(e.target.value)}
+                          placeholder="e.g. Purushottam Express"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-slate-400 text-[10px] font-medium mb-1">Boarding Station (ছাড়ার স্টেশন)</label>
+                        <input
+                          type="text"
+                          value={boardingStation}
+                          onChange={(e) => setBoardingStation(e.target.value)}
+                          placeholder="e.g. Durgapur (DGR)"
+                          list="boarding-stations-list"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-sky-500"
+                        />
+                        <datalist id="boarding-stations-list">
+                          {COMMON_BOARDING_STATIONS.map(st => (
+                            <option key={st} value={st} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <div>
+                        <label className="block text-slate-400 text-[10px] font-medium mb-1">Destination Station (গন্তব্য)</label>
+                        <input
+                          type="text"
+                          value={destinationStation}
+                          onChange={(e) => setDestinationStation(e.target.value)}
+                          placeholder="e.g. Puri (PURI)"
+                          className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-200 text-xs focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
