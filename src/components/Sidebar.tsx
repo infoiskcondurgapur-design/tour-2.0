@@ -7,20 +7,23 @@ import {
   ChevronRight,
   Users,
   Armchair,
+  Receipt,
   Globe
 } from 'lucide-react';
 import { ThemeToggle } from '../context/ThemeContext';
 
 interface SidebarProps {
-  currentView: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register';
-  setCurrentView: (view: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register') => void;
+  currentView: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'expenses' | 'public_register';
+  setCurrentView: (view: 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'expenses' | 'public_register') => void;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
   totalEarning: number;
+  totalExpenses?: number;
   totalDue: number;
   toursCount: number;
   passengersCount: number;
   allocatedSeatsCount?: number;
+  expensesCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,10 +32,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   setCollapsed,
   totalEarning,
+  totalExpenses = 0,
   totalDue,
   toursCount,
   passengersCount,
   allocatedSeatsCount = 0,
+  expensesCount = 0,
 }) => {
   const formatINR = (val: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -72,6 +77,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Seat Allocation',
       icon: Armchair,
       badge: allocatedSeatsCount > 0 ? `${allocatedSeatsCount}` : null,
+    },
+    {
+      id: 'expenses' as const,
+      label: 'Expenses',
+      icon: Receipt,
+      badge: expensesCount > 0 ? String(expensesCount) : null,
     },
     {
       id: 'public_register' as const,
@@ -170,8 +181,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="font-mono font-bold text-emerald-400">{formatINR(totalEarning)}</span>
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <span>Total Expenses:</span>
+            <span className="font-mono font-bold text-rose-400">{formatINR(totalExpenses)}</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-slate-400">
             <span>Total Due:</span>
-            <span className="font-mono font-bold text-rose-400">{formatINR(totalDue)}</span>
+            <span className="font-mono font-bold text-amber-400">{formatINR(totalDue)}</span>
           </div>
         </div>
       )}

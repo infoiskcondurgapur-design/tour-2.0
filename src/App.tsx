@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users,
   Armchair,
+  Receipt,
   Database,
   CheckCircle2,
   RefreshCw,
@@ -35,6 +36,7 @@ import { RegistrationView } from './components/RegistrationView';
 import { PassengersRosterView } from './components/PassengersRosterView';
 import { ToursView } from './components/ToursView';
 import { SeatAllocationView } from './components/SeatAllocationView';
+import { ExpensesView } from './components/ExpensesView';
 import { PublicRegistrationView } from './components/PublicRegistrationView';
 import { PwaInstallPrompt } from './components/PwaInstallPrompt';
 import { ThemeToggle } from './context/ThemeContext';
@@ -61,7 +63,7 @@ const TX_STORAGE_KEY = 'real_finance_dashboard_data_v1';
 const REG_STORAGE_KEY = 'real_finance_registrations_v1';
 const TOURS_STORAGE_KEY = 'real_finance_tours_v1';
 
-export type AppViewType = 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'public_register';
+export type AppViewType = 'dashboard' | 'registration' | 'roster' | 'tours' | 'seats' | 'expenses' | 'public_register';
 
 export function App() {
   const [currentView, setCurrentView] = useState<AppViewType>(() => {
@@ -655,6 +657,27 @@ export function App() {
     return registrations.filter(r => !!r.seatNumber).length;
   }, [registrations]);
 
+  // Count of expenses
+  const expensesCount = useMemo(() => {
+    return transactions.filter(t => t.type === 'expense').length;
+  }, [transactions]);
+
+  // Expenses Handlers
+  const handleAddExpense = (expense: FinancialTransaction) => {
+    setTransactions(prev => [expense, ...prev]);
+    upsertTransactionInDb(expense);
+  };
+
+  const handleUpdateExpense = (expense: FinancialTransaction) => {
+    setTransactions(prev => prev.map(t => t.id === expense.id ? expense : t));
+    upsertTransactionInDb(expense);
+  };
+
+  const handleDeleteExpense = (id: string) => {
+    setTransactions(prev => prev.filter(t => t.id !== id));
+    deleteTransactionFromDb(id);
+  };
+
   // Delete single transaction
   const handleDeleteTx = (id: string) => {
     setTransactions(prev => prev.filter(t => t.id !== id));
@@ -699,10 +722,12 @@ export function App() {
           collapsed={sidebarCollapsed}
           setCollapsed={setSidebarCollapsed}
           totalEarning={totalEarning}
+          totalExpenses={totalExpenses}
           totalDue={totalDue}
           toursCount={tours.length}
           passengersCount={registrations.length}
           allocatedSeatsCount={allocatedSeatsCount}
+          expensesCount={expensesCount}
         />
       </div>
 
@@ -723,10 +748,12 @@ export function App() {
               collapsed={false}
               setCollapsed={() => setMobileMenuOpen(false)}
               totalEarning={totalEarning}
+              totalExpenses={totalExpenses}
               totalDue={totalDue}
               toursCount={tours.length}
               passengersCount={registrations.length}
               allocatedSeatsCount={allocatedSeatsCount}
+              expensesCount={expensesCount}
             />
           </div>
         </div>
@@ -758,6 +785,8 @@ export function App() {
                     ? 'Registered Passengers Roster'
                     : currentView === 'tours'
                     ? 'Tours & Yatras Management'
+                    : currentView === 'expenses'
+                    ? 'Tour Expenses & Vouchers'
                     : 'Seat Allocation & Coach Map'}
                 </h1>
                 <p className="text-xs text-slate-400">
@@ -769,6 +798,8 @@ export function App() {
                     ? 'Pilgrim records, user refund status & dues'
                     : currentView === 'tours'
                     ? 'Configure tours, dates, budgets and financials'
+                    : currentView === 'expenses'
+                    ? 'Track vendor bills, operational costs & tour vouchers'
                     : 'Interactive vehicle seat assignment & passenger manifests'}
                 </p>
               </div>
@@ -906,6 +937,15 @@ export function App() {
               onUpdateRegistration={handleUpdateRegistration}
               onDeleteRegistration={handleDeleteRegistration}
               initialTour={selectedTour !== 'ALL' ? selectedTour : undefined}
+            />
+          ) : currentView === 'expenses' ? (
+            <ExpensesView
+              tours={tours}
+              transactions={transactions}
+              onAddExpense={handleAddExpense}
+              onUpdateExpense={handleUpdateExpense}
+              onDeleteExpense={handleDeleteExpense}
+              initialTourFilter={selectedTour !== 'ALL' ? selectedTour : 'ALL'}
             />
           ) : (
             <>
@@ -1156,13 +1196,18 @@ export function App() {
                 </div>
 
                 {/* 2. TOTAL EXPENSES */}
-                <div className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 relative overflow-hidden shadow-lg shadow-amber-500/5 group hover:border-amber-500/60 transition-all">
+                <div 
+                  onClick={() => setCurrentView('expenses')}
+                  className="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-5 relative overflow-hidden shadow-lg shadow-amber-500/5 group hover:border-amber-500/60 transition-all cursor-pointer"
+                  title="Click to view detailed tour expenses"
+                >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl -mr-6 -mt-6 pointer-events-none" />
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                      Total Expenses
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                      <span>Total Expenses</span>
+                      <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                     </span>
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 group-hover:bg-amber-500/20 transition-colors">
                       <TrendingDown className="w-5 h-5" />
                     </div>
                   </div>
@@ -1427,7 +1472,7 @@ export function App() {
               )}
 
               {/* Quick Navigation Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <div
                   onClick={() => setCurrentView('registration')}
                   className="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-orange-500/50 rounded-2xl p-4 sm:p-5 cursor-pointer transition-all shadow-lg group"
@@ -1497,6 +1542,24 @@ export function App() {
                   </p>
                   <span className="text-xs font-bold text-cyan-400 inline-flex items-center gap-1">
                     Manage Seats ({tourFilteredSeatedCount} seated) →
+                  </span>
+                </div>
+
+                <div
+                  onClick={() => setCurrentView('expenses')}
+                  className="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-rose-500/50 rounded-2xl p-4 sm:p-5 cursor-pointer transition-all shadow-lg group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                    <Receipt className="w-5 h-5" />
+                  </div>
+                  <h3 className="font-bold text-white text-sm sm:text-base group-hover:text-rose-400 transition-colors">
+                    Tour Expenses
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1 mb-3">
+                    Record vendor bills, fuel, food & stay costs.
+                  </p>
+                  <span className="text-xs font-bold text-rose-400 inline-flex items-center gap-1">
+                    Manage Expenses ({expensesCount}) →
                   </span>
                 </div>
               </div>
