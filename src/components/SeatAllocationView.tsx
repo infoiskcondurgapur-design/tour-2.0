@@ -224,7 +224,20 @@ export const SeatAllocationView: React.FC<SeatAllocationViewProps> = ({
     setPEditAge(p.age ?? '');
     setPEditPhone(p.phoneNumber);
     setPEditAddress(p.address || '');
-    setPEditNotes(p.notes || '');
+    const cleanUserNotes = (p.notes || '')
+      .replace(/(?:^|\s*\|\s*)Seat Type:\s*[^|,\n\]]+/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[SeatType:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)Leader(?:'s)?(?:\s*Name)?:\s*[^|,\n\]]+/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Leader:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Boarded:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Emergency:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Blood:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[PNR:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Berth:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Station:\s*[^\]]+\]/gi, '')
+      .replace(/^[\s|]+|[\s|]+$/g, '')
+      .trim();
+    setPEditNotes(cleanUserNotes);
   };
 
   const handlePEditDobChange = (newDob: string) => {

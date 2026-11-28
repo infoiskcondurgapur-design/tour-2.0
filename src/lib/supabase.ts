@@ -163,34 +163,53 @@ export function tourFromDb(r: any): Tour {
 }
 
 export function regToDb(p: PassengerRegistration) {
-  let combinedNotes = p.notes || '';
+  // Strip all legacy and structured metadata tags from p.notes so we get genuine user text
+  const baseNotes = (p.notes || '')
+    .replace(/(?:^|\s*\|\s*)Seat Type:\s*[^|,\n\]]+/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[SeatType:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)Leader(?:'s)?(?:\s*Name)?:\s*[^|,\n\]]+/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Leader:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Boarded:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Emergency:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Blood:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[PNR:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Berth:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Station:\s*[^\]]+\]/gi, '')
+    .replace(/^[\s|]+|[\s|]+$/g, '')
+    .trim();
+
+  const parts: string[] = [];
+
+  // Structured tags in a clear, consistent order:
+  if (p.seatType && p.seatType !== 'None') {
+    parts.push(`Seat Type: ${p.seatType}`);
+  }
+  if (p.leaderName) {
+    parts.push(`Leader's Name: ${p.leaderName}`);
+  }
+  if (baseNotes) {
+    parts.push(baseNotes);
+  }
   if (p.boarded) {
-    if (!combinedNotes.includes('[Boarded: true]')) {
-      combinedNotes = combinedNotes ? `${combinedNotes} | [Boarded: true]` : '[Boarded: true]';
-    }
-  } else {
-    combinedNotes = combinedNotes.replace(/\|\s*\[Boarded:\s*true\]/gi, '').replace(/\[Boarded:\s*true\]/gi, '').trim();
+    parts.push('[Boarded: true]');
   }
   if (p.emergencyPhone) {
-    combinedNotes = combinedNotes.replace(/\|\s*\[Emergency:\s*[^\]]+\]/gi, '').replace(/\[Emergency:\s*[^\]]+\]/gi, '').trim();
-    combinedNotes = combinedNotes ? `${combinedNotes} | [Emergency: ${p.emergencyPhone}]` : `[Emergency: ${p.emergencyPhone}]`;
+    parts.push(`[Emergency: ${p.emergencyPhone}]`);
   }
   if (p.bloodGroup) {
-    combinedNotes = combinedNotes.replace(/\|\s*\[Blood:\s*[^\]]+\]/gi, '').replace(/\[Blood:\s*[^\]]+\]/gi, '').trim();
-    combinedNotes = combinedNotes ? `${combinedNotes} | [Blood: ${p.bloodGroup}]` : `[Blood: ${p.bloodGroup}]`;
+    parts.push(`[Blood: ${p.bloodGroup}]`);
   }
   if (p.pnrNumber) {
-    combinedNotes = combinedNotes.replace(/\|\s*\[PNR:\s*[^\]]+\]/gi, '').replace(/\[PNR:\s*[^\]]+\]/gi, '').trim();
-    combinedNotes = combinedNotes ? `${combinedNotes} | [PNR: ${p.pnrNumber}]` : `[PNR: ${p.pnrNumber}]`;
+    parts.push(`[PNR: ${p.pnrNumber}]`);
   }
   if (p.berthPreference) {
-    combinedNotes = combinedNotes.replace(/\|\s*\[Berth:\s*[^\]]+\]/gi, '').replace(/\[Berth:\s*[^\]]+\]/gi, '').trim();
-    combinedNotes = combinedNotes ? `${combinedNotes} | [Berth: ${p.berthPreference}]` : `[Berth: ${p.berthPreference}]`;
+    parts.push(`[Berth: ${p.berthPreference}]`);
   }
   if (p.boardingStation) {
-    combinedNotes = combinedNotes.replace(/\|\s*\[Station:\s*[^\]]+\]/gi, '').replace(/\[Station:\s*[^\]]+\]/gi, '').trim();
-    combinedNotes = combinedNotes ? `${combinedNotes} | [Station: ${p.boardingStation}]` : `[Station: ${p.boardingStation}]`;
+    parts.push(`[Station: ${p.boardingStation}]`);
   }
+
+  const combinedNotes = parts.join(' | ') || null;
 
   return {
     id: p.id,
@@ -217,17 +236,21 @@ export function regToDb(p: PassengerRegistration) {
     seat_number: p.seatNumber || null,
     seat_type: p.seatType || 'None',
     vehicle_name: p.vehicleName || null,
-    notes: combinedNotes || null,
+    notes: combinedNotes,
     status: p.status,
     updated_at: new Date().toISOString(),
   };
 }
 
 export function regFromDb(r: any): PassengerRegistration {
+  const notesStr = r.notes || '';
+
   // Extract seatType from r.seat_type or parse from notes as fallback
-  let seatType: SeatType = r.seat_type || 'None';
-  if ((!seatType || seatType === 'None') && r.notes) {
-    const match = r.notes.match(/Seat Type:\s*([^|,\n]+)/i);
+  let seatType: SeatType = 'None';
+  if (r.seat_type && r.seat_type !== 'None' && SEAT_TYPE_OPTIONS.includes(r.seat_type)) {
+    seatType = r.seat_type;
+  } else if (notesStr) {
+    const match = notesStr.match(/Seat Type:\s*([^|,\n\]]+)/i) || notesStr.match(/\[SeatType:\s*([^\]]+)\]/i);
     if (match && match[1]) {
       const parsed = match[1].trim() as SeatType;
       if (SEAT_TYPE_OPTIONS.includes(parsed)) {
@@ -238,50 +261,65 @@ export function regFromDb(r: any): PassengerRegistration {
 
   // Extract leaderName from r.leader_name or parse from notes as fallback
   let leaderName: string | undefined = r.leader_name || undefined;
-  if (!leaderName && r.notes) {
-    const match = r.notes.match(/Leader(?:'s)?(?:\s*Name)?:\s*([^|,\n]+)/i);
+  if (!leaderName && notesStr) {
+    const match = notesStr.match(/Leader(?:'s)?(?:\s*Name)?:\s*([^|,\n\]]+)/i) || notesStr.match(/\[Leader:\s*([^\]]+)\]/i);
     if (match && match[1]) {
       leaderName = match[1].trim();
     }
   }
 
   // Extract boarded
-  const boarded = r.boarded === true || /\[Boarded:\s*true\]/i.test(r.notes || '');
+  const boarded = r.boarded === true || /\[Boarded:\s*true\]/i.test(notesStr);
 
   // Extract emergencyPhone
   let emergencyPhone = r.emergency_phone || undefined;
-  if (!emergencyPhone && r.notes) {
-    const match = r.notes.match(/\[Emergency:\s*([^\]]+)\]/i);
+  if (!emergencyPhone && notesStr) {
+    const match = notesStr.match(/\[Emergency:\s*([^\]]+)\]/i);
     if (match && match[1]) emergencyPhone = match[1].trim();
   }
 
   // Extract bloodGroup
   let bloodGroup = r.blood_group || undefined;
-  if (!bloodGroup && r.notes) {
-    const match = r.notes.match(/\[Blood:\s*([^\]]+)\]/i);
+  if (!bloodGroup && notesStr) {
+    const match = notesStr.match(/\[Blood:\s*([^\]]+)\]/i);
     if (match && match[1]) bloodGroup = match[1].trim();
   }
 
   // Extract pnrNumber
   let pnrNumber = r.pnr_number || undefined;
-  if (!pnrNumber && r.notes) {
-    const match = r.notes.match(/\[PNR:\s*([^\]]+)\]/i);
+  if (!pnrNumber && notesStr) {
+    const match = notesStr.match(/\[PNR:\s*([^\]]+)\]/i);
     if (match && match[1]) pnrNumber = match[1].trim();
   }
 
   // Extract berthPreference
   let berthPreference = r.berth_preference || undefined;
-  if (!berthPreference && r.notes) {
-    const match = r.notes.match(/\[Berth:\s*([^\]]+)\]/i);
+  if (!berthPreference && notesStr) {
+    const match = notesStr.match(/\[Berth:\s*([^\]]+)\]/i);
     if (match && match[1]) berthPreference = match[1].trim();
   }
 
   // Extract boardingStation
   let boardingStation = r.boarding_station || undefined;
-  if (!boardingStation && r.notes) {
-    const match = r.notes.match(/\[Station:\s*([^\]]+)\]/i);
+  if (!boardingStation && notesStr) {
+    const match = notesStr.match(/\[Station:\s*([^\]]+)\]/i);
     if (match && match[1]) boardingStation = match[1].trim();
   }
+
+  // Extract genuine user notes by stripping all system tags
+  const cleanNotes = notesStr
+    .replace(/(?:^|\s*\|\s*)Seat Type:\s*[^|,\n\]]+/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[SeatType:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)Leader(?:'s)?(?:\s*Name)?:\s*[^|,\n\]]+/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Leader:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Boarded:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Emergency:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Blood:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[PNR:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Berth:\s*[^\]]+\]/gi, '')
+    .replace(/(?:^|\s*\|\s*)\[Station:\s*[^\]]+\]/gi, '')
+    .replace(/^[\s|]+|[\s|]+$/g, '')
+    .trim();
 
   return {
     id: r.id,
@@ -314,7 +352,7 @@ export function regFromDb(r: any): PassengerRegistration {
     berthPreference,
     boardingStation,
     boarded,
-    notes: r.notes || undefined,
+    notes: cleanNotes || undefined,
     status: r.status || 'unpaid',
   };
 }
@@ -420,45 +458,33 @@ export async function fetchRegistrationsFromDb(): Promise<PassengerRegistration[
   }
 }
 
+// Tracks whether the Supabase database table has explicit columns for seat_type and leader_name
+let extraRegistrationColumnsSupported: boolean | null = null;
+
 export async function upsertRegistrationInDb(reg: PassengerRegistration): Promise<boolean> {
   const client = getActiveSupabaseClient();
   if (!client) return false;
   try {
     const payload = regToDb(reg);
-    let { error } = await client.from('tour_registrations').upsert(payload, { onConflict: 'id' });
     
-    // If 'seat_type' or 'leader_name' column does not exist yet on Supabase schema cache (PGRST204), fallback seamlessly
-    if (error && error.code === 'PGRST204') {
-      const fallbackPayload: any = { ...payload };
-      if (error.message.includes('leader_name') || error.message.includes('column')) {
-        delete fallbackPayload.leader_name;
-        if (reg.leaderName) {
-          const existingNotes = fallbackPayload.notes || '';
-          if (!existingNotes.includes("Leader's Name:")) {
-            fallbackPayload.notes = `Leader's Name: ${reg.leaderName}${existingNotes ? ' | ' + existingNotes : ''}`;
-          }
-        }
-      }
-      if (error.message.includes('seat_type') || error.message.includes('column')) {
-        delete fallbackPayload.seat_type;
-        if (reg.seatType && reg.seatType !== 'None') {
-          const existingNotes = fallbackPayload.notes || '';
-          if (!existingNotes.includes('Seat Type:')) {
-            fallbackPayload.notes = `Seat Type: ${reg.seatType}${existingNotes ? ' | ' + existingNotes : ''}`;
-          }
-        }
-      }
+    // If we already know the database table lacks seat_type or leader_name columns, omit them to avoid 400 Bad Request
+    const sendPayload: any = { ...payload };
+    if (extraRegistrationColumnsSupported === false) {
+      delete sendPayload.seat_type;
+      delete sendPayload.leader_name;
+    }
 
-      const retryRes = await client.from('tour_registrations').upsert(fallbackPayload, { onConflict: 'id' });
-      if (retryRes.error && retryRes.error.code === 'PGRST204') {
-        // In case multiple missing columns, strip both
-        delete fallbackPayload.leader_name;
-        delete fallbackPayload.seat_type;
-        const retryRes2 = await client.from('tour_registrations').upsert(fallbackPayload, { onConflict: 'id' });
-        error = retryRes2.error;
-      } else {
-        error = retryRes.error;
-      }
+    let { error } = await client.from('tour_registrations').upsert(sendPayload, { onConflict: 'id' });
+    
+    // If 'seat_type' or 'leader_name' column does not exist yet on Supabase schema cache (PGRST204 or 42703), strip them and retry
+    if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && error.message.includes('column')))) {
+      extraRegistrationColumnsSupported = false;
+      delete sendPayload.seat_type;
+      delete sendPayload.leader_name;
+      const retryRes = await client.from('tour_registrations').upsert(sendPayload, { onConflict: 'id' });
+      error = retryRes.error;
+    } else if (!error && extraRegistrationColumnsSupported === null) {
+      extraRegistrationColumnsSupported = true;
     }
 
     if (error) {

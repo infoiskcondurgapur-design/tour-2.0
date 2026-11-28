@@ -158,7 +158,21 @@ export const PassengersRosterView: React.FC<PassengersRosterViewProps> = ({
     setEditBerthPreference(reg.berthPreference || '');
     setEditBoardingStation(reg.boardingStation || '');
     setEditBoarded(reg.boarded || false);
-    setEditNotes(reg.notes || '');
+    // Strip any legacy internal tags so user notes field only contains genuine text
+    const cleanUserNotes = (reg.notes || '')
+      .replace(/(?:^|\s*\|\s*)Seat Type:\s*[^|,\n\]]+/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[SeatType:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)Leader(?:'s)?(?:\s*Name)?:\s*[^|,\n\]]+/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Leader:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Boarded:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Emergency:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Blood:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[PNR:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Berth:\s*[^\]]+\]/gi, '')
+      .replace(/(?:^|\s*\|\s*)\[Station:\s*[^\]]+\]/gi, '')
+      .replace(/^[\s|]+|[\s|]+$/g, '')
+      .trim();
+    setEditNotes(cleanUserNotes);
     setEditStatus(reg.status);
   };
 
